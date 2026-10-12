@@ -24,18 +24,21 @@ Future<void> runMigrations(Db db) async {
       .toList()
     ..sort((a, b) => a.path.compareTo(b.path));
   for (final f in files) {
-    final sql = await f.readAsString();
+    var sql = await f.readAsString();
+    // Buang baris komentar DULU (sebelum pecah ';') — komentar bisa
+    // mengandung ';' (mis. "(dibaca via API; push/FCM)") yang akan
+    // memenggal statement bila dipecah lebih dulu.
+    sql = sql
+        .split('\n')
+        .where((l) => !l.trimLeft().startsWith('--'))
+        .join('\n');
     // postgres driver menolak multi-statement per query: pecah per ';'.
     // (Migrasi kita hanya DDL sederhana, tanpa fungsi/trigger ber-semicolon.)
-    final statements = <String>[];
-    for (final chunk in sql.split(';')) {
-      final lines = chunk
-          .split('\n')
-          .where((l) => !l.trimLeft().startsWith('--'))
-          .join('\n')
-          .trim();
-      if (lines.isNotEmpty) statements.add(lines);
-    }
+    final statements = sql
+        .split(';')
+        .map((s) => s.trim())
+        .where((s) => s.isNotEmpty)
+        .toList();
     await db.pool.runTx((tx) async {
       for (final s in statements) {
         await tx.execute(s);
