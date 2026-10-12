@@ -114,4 +114,29 @@ class ApiNotificationRepository implements NotificationRepository {
     );
     _ping();
   }
+
+  /// Daftarkan token push perangkat ke server (dipanggil setelah login /
+  /// saat token refresh). Gagal = push mati, aplikasi tetap jalan.
+  Future<void> syncPushToken(String token, String platform) async {
+    final res = await _client.post(
+      Uri.parse('$_base/users/me/push-tokens'),
+      headers: await _h(),
+      body: jsonEncode({'token': token, 'platform': platform}),
+    );
+    if (res.statusCode != 200) {
+      throw const AppException('Sinkron token push gagal.');
+    }
+  }
+
+  /// Hapus token push perangkat (dipanggil saat keluar).
+  Future<void> clearPushToken([String? token]) async {
+    try {
+      await _client.delete(
+        Uri.parse('$_base/users/me/push-tokens'),
+        headers: await _h(),
+        body: jsonEncode({'token': token ?? ''}),
+      );
+    } catch (_) {}
+    _ping();
+  }
 }

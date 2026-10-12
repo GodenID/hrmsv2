@@ -14,7 +14,9 @@ class Config {
         s3pathStyle =
             (env['S3_PATH_STYLE'] ?? 'false').toLowerCase() == 'true',
         s3avatarPublic =
-            (env['S3_AVATAR_PUBLIC'] ?? 'true').toLowerCase() == 'true';
+            (env['S3_AVATAR_PUBLIC'] ?? 'true').toLowerCase() == 'true',
+        fcmProjectId = env['FCM_PROJECT_ID'] ?? '',
+        fcmServiceAccount = env['FCM_SERVICE_ACCOUNT'] ?? '';
 
   final int port;
   final String databaseUrl;
@@ -30,6 +32,10 @@ class Config {
   final String s3secretKey;
   final bool s3pathStyle;
   final bool s3avatarPublic;
+
+  /// Push FCM HTTP v1. Kosong = push mati (notifikasi dalam aplikasi saja).
+  final String fcmProjectId;
+  final String fcmServiceAccount;
 
   bool get s3enabled =>
       s3endpoint.isNotEmpty &&

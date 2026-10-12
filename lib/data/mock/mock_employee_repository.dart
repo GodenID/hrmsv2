@@ -27,10 +27,10 @@ class MockEmployeeRepository implements EmployeeRepository {
   // Bantuan
   // ---------------------------------------------------------------------------
 
-  void _requireManager(AuthUser actor) {
-    if (!actor.role.canManageEmployees) {
+  void _requireSuperAdmin(AuthUser actor) {
+    if (actor.role != UserRole.superadmin) {
       throw const PermissionDeniedException(
-        'Hanya Manager dan Super Admin yang dapat mengelola karyawan.',
+        'Hanya Super Admin yang dapat mengelola data karyawan.',
       );
     }
   }
@@ -43,14 +43,19 @@ class MockEmployeeRepository implements EmployeeRepository {
     return a;
   }
 
+  /// Akun Super Admin disembunyikan dari non-Super Admin.
+  bool _hiddenFrom(AuthUser actor, MockAccount a) =>
+      a.role == UserRole.superadmin && actor.role != UserRole.superadmin;
+
   static String _maskNik(String nik) {
     if (nik.length != 16) return '•••• •••• •••• ••••';
     return '${nik.substring(0, 4)} •••• •••• ${nik.substring(12)}';
   }
 
   EmployeeAccount _toAccount(AuthUser actor, MockAccount a) {
-    final canEdit = actor.role.canManageRole(a.role);
-    final canActOn = store.canActOn(actor, a);
+    final isSuper = actor.role == UserRole.superadmin;
+    final canEdit = isSuper && actor.role.canManageRole(a.role);
+    final canActOn = isSuper && store.canActOn(actor, a);
     final manager = a.managerUsername == null
         ? null
         : store.account(a.managerUsername!);
@@ -111,6 +116,7 @@ class MockEmployeeRepository implements EmployeeRepository {
     EmployeeDraft d, {
     MockAccount? existing,
   }) {
+    _requireSuperAdmin(actor);
     _check(EmployeeRules.validateFullName(d.fullName));
     _check(EmployeeRules.validateNik(d.nik));
     _check(EmployeeRules.validateEmployeeId(d.employeeId));
@@ -232,10 +238,12 @@ class MockEmployeeRepository implements EmployeeRepository {
   @override
   Future<List<EmployeeAccount>> fetchEmployees(AuthUser actor) async {
     await Future<void>.delayed(latency);
-    _requireManager(actor);
     final sorted = [...store.accounts.values]
       ..sort((a, b) => a.fullName.compareTo(b.fullName));
-    return List.unmodifiable([for (final a in sorted) _toAccount(actor, a)]);
+    return List.unmodifiable([
+      for (final a in sorted)
+        if (!_hiddenFrom(actor, a)) _toAccount(actor, a),
+    ]);
   }
 
   @override
@@ -244,8 +252,11 @@ class MockEmployeeRepository implements EmployeeRepository {
     required String username,
   }) async {
     await Future<void>.delayed(latency);
-    _requireManager(actor);
-    return _toAccount(actor, _find(username));
+    final a = _find(username);
+    if (_hiddenFrom(actor, a)) {
+      throw const AppException('Karyawan tidak ditemukan.');
+    }
+    return _toAccount(actor, a);
   }
 
   @override
@@ -255,7 +266,7 @@ class MockEmployeeRepository implements EmployeeRepository {
     required EmployeeDraft draft,
   }) async {
     await Future<void>.delayed(latency);
-    _requireManager(actor);
+    _requireSuperAdmin(actor);
     final name = username.trim().toLowerCase();
     _check(EmployeeRules.validateUsername(name));
     if (store.account(name) != null) {
@@ -296,7 +307,7 @@ class MockEmployeeRepository implements EmployeeRepository {
     required EmployeeDraft draft,
   }) async {
     await Future<void>.delayed(latency);
-    _requireManager(actor);
+    _requireSuperAdmin(actor);
     final a = _find(username);
     if (!actor.role.canManageRole(a.role)) {
       throw PermissionDeniedException(
@@ -316,7 +327,7 @@ class MockEmployeeRepository implements EmployeeRepository {
     required bool active,
   }) async {
     await Future<void>.delayed(latency);
-    _requireManager(actor);
+    _requireSuperAdmin(actor);
     final a = _find(username);
     if (a.username == actor.username) {
       throw const PermissionDeniedException(
@@ -342,7 +353,7 @@ class MockEmployeeRepository implements EmployeeRepository {
     required String username,
   }) async {
     await Future<void>.delayed(latency);
-    _requireManager(actor);
+    _requireSuperAdmin(actor);
     final a = _find(username);
     if (a.username == actor.username) {
       throw const PermissionDeniedException(

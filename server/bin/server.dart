@@ -9,10 +9,12 @@ import 'package:prasasti_server/attendance_handlers.dart';
 import 'package:prasasti_server/auth_handlers.dart';
 import 'package:prasasti_server/event_handlers.dart';
 import 'package:prasasti_server/leave_handlers.dart';
+import 'package:prasasti_server/notify.dart' show PushBus;
 import 'package:prasasti_server/upload_handlers.dart';
 import 'package:prasasti_server/warning_handlers.dart';
 import 'package:prasasti_server/config.dart';
 import 'package:prasasti_server/db.dart';
+import 'package:prasasti_server/fcm.dart';
 import 'package:prasasti_server/employee_handlers.dart';
 
 Future<void> runMigrations(Db db) async {
@@ -51,6 +53,7 @@ Future<void> runMigrations(Db db) async {
 Future<void> main() async {
   final cfg = Config.fromEnv(Platform.environment)..validate();
   final db = await Db.open(cfg.databaseUrl);
+  PushBus.configure(database: db, sender: FcmSender(cfg));
   if (cfg.runMigrations) await runMigrations(db);
 
   final auth = authRouter(db, cfg);
@@ -75,6 +78,7 @@ Future<void> main() async {
     if (p.startsWith('leave')) return leave.call(req);
     if (p.startsWith('overtime')) return ot.call(req);
     if (p.startsWith('notifications')) return notif.call(req);
+    if (p.startsWith('users/me/')) return notif.call(req);
     if (p.startsWith('uploads/') || p.startsWith('profile')) return up.call(req);
     if (p.startsWith('announcements')) return ann.call(req);
     if (p.startsWith('events')) return ev.call(req);

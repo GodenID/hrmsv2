@@ -6,6 +6,7 @@ import '../../app_routes.dart';
 import '../../core/app_info.dart';
 import '../../core/app_scope.dart';
 import '../../core/theme/theme_colors.dart';
+import '../../data/api/api_notification_repository.dart';
 
 /// Keluar: hapus token tersimpan, cabut sesi di server, lalu kembali ke
 /// halaman login (dari halaman mana pun di shell).
@@ -21,6 +22,10 @@ Future<void> signOut(BuildContext context) async {
   if (session != null) {
     // Tidak ditunggu: keluar tidak boleh terhambat koneksi.
     unawaited(deps.auth.logout(session.token).catchError((Object _) {}));
+    final notifications = deps.notifications;
+    if (notifications is ApiNotificationRepository) {
+      unawaited(notifications.clearPushToken().catchError((Object _) {}));
+    }
   }
   navigator.pushNamedAndRemoveUntil(AppRoutes.login, (_) => false);
 }

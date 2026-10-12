@@ -4,6 +4,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'app_routes.dart';
 import 'core/app_info.dart';
 import 'core/app_scope.dart';
+import 'core/push_notifications.dart';
 import 'core/theme/app_theme.dart';
 import 'data/auth_repository.dart';
 import 'features/auth/forgot_password_page.dart';
@@ -24,6 +25,7 @@ class PrasastiConnectApp extends StatelessWidget {
       child: MaterialApp(
         title: AppInfo.appName,
         debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: PushNotifications.messengerKey,
         theme: AppTheme.light(),
         // Kalender, pemilih jam, dan teks bawaan Material dalam Bahasa
         // Indonesia.

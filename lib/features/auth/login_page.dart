@@ -1,10 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app_routes.dart';
+import '../../core/app_scope.dart';
+import '../../core/push_notifications.dart';
 import '../../core/session_storage.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_colors.dart';
 import '../../core/utils/validators.dart';
+import '../../data/api/api_auth_repository.dart' show ApiConfig;
+import '../../data/api/api_notification_repository.dart';
 import '../../data/auth_repository.dart';
 import 'widgets/auth_shell.dart';
 import '../../core/widgets/form_widgets.dart';
@@ -70,6 +76,7 @@ class _LoginPageState extends State<LoginPage> {
 
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
+    final notifications = AppScope.of(context).notifications;
 
     try {
       final session = await widget.authRepository.login(
@@ -83,6 +90,18 @@ class _LoginPageState extends State<LoginPage> {
         // Penyimpanan tidak tersedia (mis. mode privat): tetap lanjut,
         // hanya saja sesi tidak bertahan setelah refresh.
       }
+      // Daftarkan token push perangkat (nonblokir, gagal = push mati).
+      try {
+        if (notifications is ApiNotificationRepository) {
+          unawaited(
+            PushNotifications.syncSessionToken(
+              baseUrl: ApiConfig.baseUrl,
+              readToken: widget.sessionStorage.readToken,
+              syncToken: notifications.syncPushToken,
+            ),
+          );
+        }
+      } catch (_) {}
       if (!mounted) return;
       Navigator.of(context)
           .pushReplacementNamed(AppRoutes.home, arguments: session);

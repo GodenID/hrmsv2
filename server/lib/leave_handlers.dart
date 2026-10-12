@@ -855,5 +855,49 @@ Router notificationRouter(Db db, Config cfg) {
     }
   });
 
+  // ---------- token push per perangkat ----------
+  r.post('/users/me/push-tokens', (Request req) async {
+    try {
+      final u = await me(req);
+      final b = await readJson(req);
+      final token = ((b['token'] ?? '') as String).trim();
+      final platform = ((b['platform'] ?? 'android') as String).trim();
+      if (token.length < 10) throw const _Http(422, 'Token push tidak valid.');
+      await db.pool.runTx((tx) => tx.execute(Sql.named('''
+        INSERT INTO fcm_tokens(token, user_id, platform, updated_at)
+        VALUES(@t,@i::uuid,@p,now())
+        ON CONFLICT (token) DO UPDATE SET user_id=@i::uuid, updated_at=now()
+      '''), parameters: {
+        't': token,
+        'i': (u['id'] as Object).toString(),
+        'p': platform.isEmpty ? 'android' : platform,
+      }));
+      return json({'ok': true});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.delete('/users/me/push-tokens', (Request req) async {
+    try {
+      final u = await me(req);
+      final b = await readJson(req);
+      final token = ((b['token'] ?? '') as String).trim();
+      await db.pool.runTx((tx) => tx.execute(
+            token.isEmpty
+                ? Sql.named('DELETE FROM fcm_tokens WHERE user_id=@i::uuid')
+                : Sql.named(
+                    'DELETE FROM fcm_tokens WHERE user_id=@i::uuid AND token=@t'),
+            parameters: {
+              'i': (u['id'] as Object).toString(),
+              if (token.isNotEmpty) 't': token,
+            },
+          ));
+      return json({'ok': true});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
   return r;
 }

@@ -46,9 +46,9 @@ class _Destination {
 }
 
 /// Menu per role. Profil & Keluar ada di menu akun (avatar kanan atas).
-/// - Staff: Beranda, Absensi, Pengajuan, Event (+ Peringatan di "Lainnya").
-/// - Manager & Super Admin: + Persetujuan & Karyawan (bagian "Kelola").
-///   Super Admin juga: Lokasi absen.
+/// - Staff: Beranda, Absensi, Pengajuan, Event, Karyawan (+ Peringatan di "Lainnya").
+/// - Manager & Super Admin: + Persetujuan (bagian "Kelola").
+///   Super Admin juga: Lokasi absen + Tambah/ubah karyawan.
 ///   Di HP: Beranda, Absensi, Pengajuan, Persetujuan, lalu "Lainnya".
 List<_Destination> _destinationsFor(UserRole role) {
   final manages = role.canReviewRequests || role.canManageEmployees;
@@ -91,16 +91,17 @@ List<_Destination> _destinationsFor(UserRole role) {
         builder: (_) => const ApprovalsPage(),
         section: _Section.manage,
       ),
-    if (role.canManageEmployees)
-      _Destination(
-        tab: ShellTab.employees,
-        label: 'Karyawan',
-        icon: Icons.people_outline,
-        selectedIcon: Icons.people,
-        builder: (_) => const EmployeeListPage(),
-        section: _Section.manage,
-        primaryOnMobile: false,
-      ),
+    // Direktori karyawan dapat dilihat semua role (read-only kecuali
+    // Super Admin); akun Super Admin disembunyikan dari non-Super Admin.
+    _Destination(
+      tab: ShellTab.employees,
+      label: 'Karyawan',
+      icon: Icons.people_outline,
+      selectedIcon: Icons.people,
+      builder: (_) => const EmployeeListPage(),
+      section: _Section.manage,
+      primaryOnMobile: false,
+    ),
     if (role.canManageAttendanceLocations)
       _Destination(
         tab: ShellTab.locations,

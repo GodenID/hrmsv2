@@ -9,6 +9,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'config.dart';
 import 'db.dart';
 import 'notify.dart';
+import 'rate_limit.dart';
 import 'tokens.dart';
 import 'validate.dart';
 
@@ -60,6 +61,9 @@ Router authRouter(Db db, Config cfg) {
   });
 
   r.post('/auth/check-username', (Request req) async {
+    final limited = limitIp(req, 'check-username',
+        max: 30, window: const Duration(minutes: 1));
+    if (limited != null) return limited;
     final body = await readJson(req);
     final name = ((body['username'] ?? '') as String).trim().toLowerCase();
     final err = validateUsername(name);
@@ -76,7 +80,10 @@ Router authRouter(Db db, Config cfg) {
   });
 
   Future<Response> doRegister(Db db, Config cfg, Request req) async {
-  final b = await readJson(req);
+    final limited = limitIp(req, 'register',
+        max: 10, window: const Duration(hours: 1));
+    if (limited != null) return limited;
+    final b = await readJson(req);
   String s(String k) => ((b[k] ?? '') as Object).toString();
   final name = s('username').trim().toLowerCase();
 
@@ -201,6 +208,9 @@ Router authRouter(Db db, Config cfg) {
 
   // ---- login (5x gagal -> kunci 15 mnt) ----
   r.post('/auth/login', (Request req) async {
+    final limited = limitIp(req, 'login',
+        max: 30, window: const Duration(minutes: 1));
+    if (limited != null) return limited;
     final b = await readJson(req);
     final name = ((b['username'] ?? '') as String).trim().toLowerCase();
     final pw = ((b['password'] ?? '') as String);
@@ -318,6 +328,9 @@ Router authRouter(Db db, Config cfg) {
 
   // ---- lupa password: verify-username / verify-nik / reset ----
   r.post('/auth/recovery/verify-username', (Request req) async {
+    final limited = limitIp(req, 'recovery',
+        max: 20, window: const Duration(minutes: 1));
+    if (limited != null) return limited;
     final b = await readJson(req);
     final name = ((b['username'] ?? '') as String).trim().toLowerCase();
     final n = await db.pool.runTx((tx) async {
@@ -332,6 +345,9 @@ Router authRouter(Db db, Config cfg) {
   });
 
   r.post('/auth/recovery/verify-nik', (Request req) async {
+    final limited = limitIp(req, 'recovery',
+        max: 20, window: const Duration(minutes: 1));
+    if (limited != null) return limited;
     final b = await readJson(req);
     final name = ((b['username'] ?? '') as String).trim().toLowerCase();
     final nik = ((b['nik'] ?? '') as String).trim();

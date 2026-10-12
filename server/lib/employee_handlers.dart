@@ -45,8 +45,10 @@ String tempPassword() {
 }
 
 Map<String, dynamic> toAccount(Map<String, dynamic> a, Map<String, dynamic> actor) {
-  final canEdit = canManageRole(actor['role'] as String, a['role'] as String);
-  final canActOn = actor['username'] != a['username'] &&
+  final isSuper = actor['role'] == 'superadmin';
+  final canEdit = isSuper && canManageRole(actor['role'] as String, a['role'] as String);
+  final canActOn = isSuper &&
+      actor['username'] != a['username'] &&
       canManageRole(actor['role'] as String, a['role'] as String);
   return {
     'username': a['username'],
@@ -102,11 +104,21 @@ Router employeeRouter(Db db, Config cfg) {
   Future<Map<String, dynamic>> requireManager(Request req) async {
     final u = await authedUser(req, db, cfg);
     if (u == null) throw const _Http(401, 'Sesi berakhir. Silakan masuk kembali.');
-    if (!canManageEmployees(u['role'] as String)) {
-      throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat mengelola karyawan.');
+    return u;
+  }
+
+  Future<Map<String, dynamic>> requireSuperAdmin(Request req) async {
+    final u = await authedUser(req, db, cfg);
+    if (u == null) throw const _Http(401, 'Sesi berakhir. Silakan masuk kembali.');
+    if (u['role'] != 'superadmin') {
+      throw const _Http(403, 'Hanya Super Admin yang dapat mengelola data karyawan.');
     }
     return u;
   }
+
+  /// Akun Super Admin disembunyikan dari non-Super Admin.
+  bool hiddenFrom(Map<String, dynamic> actor, Map<String, dynamic> a) =>
+      a['role'] == 'superadmin' && actor['role'] != 'superadmin';
 
   r.get('/employees', (Request req) async {
     try {
@@ -118,6 +130,8 @@ Router employeeRouter(Db db, Config cfg) {
         for (final row in rows)
           toAccount(row.toColumnMap().map((k, v) => MapEntry(k.toString(), v)), actor),
       ];
+      list.removeWhere(
+          (e) => actor['role'] != 'superadmin' && (e['role'] == 'superadmin'));
       return json({'employees': list});
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
@@ -132,8 +146,12 @@ Router employeeRouter(Db db, Config cfg) {
             parameters: {'u': username.trim().toLowerCase()},
           ));
       if (rows.isEmpty) return json({'message': 'Karyawan tidak ditemukan.'}, status: 404);
-      return json(toAccount(
-          rows.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v)), actor));
+      final target =
+          rows.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+      if (hiddenFrom(actor, target)) {
+        return json({'message': 'Karyawan tidak ditemukan.'}, status: 404);
+      }
+      return json(toAccount(target, actor));
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }
@@ -141,7 +159,7 @@ Router employeeRouter(Db db, Config cfg) {
 
   r.post('/employees', (Request req) async {
     try {
-      final actor = await requireManager(req);
+      final actor = await requireSuperAdmin(req);
       final b = await readJson(req);
       final name = ((b['username'] ?? '') as String).trim().toLowerCase();
       final uErr = validateUsername(name);
@@ -208,7 +226,7 @@ Router employeeRouter(Db db, Config cfg) {
 
   r.put('/employees/<username>', (Request req, String username) async {
     try {
-      final actor = await requireManager(req);
+      final actor = await requireSuperAdmin(req);
       final b = await readJson(req);
       final dErr = validateDraft(b);
       if (dErr != null) return json({'message': dErr}, status: 422);
@@ -271,7 +289,7 @@ Router employeeRouter(Db db, Config cfg) {
 
   r.patch('/employees/<username>/active', (Request req, String username) async {
     try {
-      final actor = await requireManager(req);
+      final actor = await requireSuperAdmin(req);
       final b = await readJson(req);
       final active = b['active'] == true;
       final updated = await db.pool.runTx((tx) async {
@@ -306,7 +324,7 @@ Router employeeRouter(Db db, Config cfg) {
 
   r.post('/employees/<username>/reset-password', (Request req, String username) async {
     try {
-      final actor = await requireManager(req);
+      final actor = await requireSuperAdmin(req);
       final password = await db.pool.runTx((tx) async {
         final cur = await tx.execute(
           Sql.named('SELECT * FROM users WHERE username=@u'),

@@ -5,11 +5,11 @@ import 'auth_repository.dart';
 /// Kontrak kelola karyawan (menu Karyawan).
 ///
 /// Hak akses (WAJIB ditegakkan di server):
-/// - Manager & Super Admin dapat melihat daftar karyawan.
-/// - Manager hanya dapat menambah / mengubah / menonaktifkan / mereset
-///   password akun **Staff**, dan hanya dapat memberikan role Staff.
-/// - Super Admin dapat mengelola semua akun, kecuali menonaktifkan,
-///   mengganti role, atau mereset password akunnya sendiri.
+/// - SEMUA role dapat melihat daftar & detail karyawan, tetapi akun Super
+///   Admin disembunyikan dari non-Super Admin (tidak muncul di daftar,
+///   tidak bisa dibuka).
+/// - Membuat / mengubah / menonaktifkan / mereset password: HANYA Super
+///   Admin. Manager & Staff read-only.
 /// - Akun nonaktif tidak bisa login dan sesinya dicabut.
 abstract class EmployeeRepository {
   Listenable get changes;

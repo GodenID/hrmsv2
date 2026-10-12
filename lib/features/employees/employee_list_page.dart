@@ -13,7 +13,8 @@ import '../../data/employee_repository.dart';
 import '../shell/shell_routes.dart';
 import 'widgets/registration_toggle_panel.dart';
 
-/// Daftar karyawan (Manager & Super Admin) + pencarian + tambah karyawan.
+/// Daftar karyawan (semua role dapat melihat) + pencarian.
+/// Tambah / ubah hanya Super Admin.
 class EmployeeListPage extends StatefulWidget {
   const EmployeeListPage({super.key});
 
@@ -112,24 +113,27 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
   @override
   Widget build(BuildContext context) {
     final isWide = AppSpacing.isSidebarLayout(MediaQuery.sizeOf(context).width);
+    final canAdd =
+        SessionScope.userOf(context).role == UserRole.superadmin;
 
     return PageScaffold(
       title: 'Karyawan',
       onRefresh: _load,
       actions: [
-        if (isWide)
-          FilledButton.icon(
-            onPressed: _create,
-            style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
-            icon: const Icon(Icons.person_add_alt, size: 18),
-            label: const Text('Tambah karyawan'),
-          )
-        else
-          TextButton.icon(
-            onPressed: _create,
-            icon: const Icon(Icons.person_add_alt, size: 18),
-            label: const Text('Tambah'),
-          ),
+        if (canAdd)
+          if (isWide)
+            FilledButton.icon(
+              onPressed: _create,
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+              icon: const Icon(Icons.person_add_alt, size: 18),
+              label: const Text('Tambah karyawan'),
+            )
+          else
+            TextButton.icon(
+              onPressed: _create,
+              icon: const Icon(Icons.person_add_alt, size: 18),
+              label: const Text('Tambah'),
+            ),
       ],
       child: AsyncBody(
         isLoading: _isLoading,
@@ -148,6 +152,8 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     final inactive = all.where((e) => !e.active).toList();
     final missingCount = active.where(isMissingManager).length;
     final q = _searchController.text.trim().toLowerCase();
+    final isSuper =
+        SessionScope.userOf(context).role == UserRole.superadmin;
     final shown = (_showInactive ? inactive : active)
         .where((e) => _matches(e, q))
         .toList();
@@ -208,10 +214,11 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                     child: Text('Semua role'),
                   ),
                   for (final r in UserRole.values)
-                    DropdownMenuItem<UserRole?>(
-                      value: r,
-                      child: Text(r.label),
-                    ),
+                    if (isSuper || r != UserRole.superadmin)
+                      DropdownMenuItem<UserRole?>(
+                        value: r,
+                        child: Text(r.label),
+                      ),
                 ],
                 onChanged: (r) => setState(() => _roleFilter = r),
                 decoration: const InputDecoration(
@@ -260,7 +267,9 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                   ? 'Coba kata kunci lain atau matikan filter.'
                   : (_showInactive
                         ? 'Akun yang dinonaktifkan akan muncul di sini.'
-                        : 'Tambahkan karyawan lewat tombol Tambah.'),
+                        : (isSuper
+                              ? 'Tambahkan karyawan lewat tombol Tambah.'
+                              : 'Belum ada data karyawan.')),
             ),
           )
         else
