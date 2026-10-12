@@ -139,8 +139,8 @@ class MockEventRepository implements EventRepository {
       startDate: r.startDate,
       endDate: r.endDate,
       location: r.location,
-      // Server tidak mengirim nilai PO ke role yang tidak berhak.
-      poValue: viewer.role.canViewEventPo ? r.poValue : null,
+      // Nilai PO terbuka untuk semua role (keputusan produk).
+      poValue: r.poValue,
       size: _thresholds.classify(r.poValue),
       createdBy: r.createdBy,
       crew: List.unmodifiable(crew),

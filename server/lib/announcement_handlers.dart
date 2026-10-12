@@ -182,11 +182,17 @@ Router announcementRouter(Db db, Config cfg) {
   r.get('/announcements/<id>/readers', (Request req, String id) async {
     try {
       await me(req);
-      final v = await db.pool.runTx((tx) => tx.execute(Sql.named('''
-        SELECT v.username, u.full_name, v.viewed_at FROM announcement_views v
-        LEFT JOIN users u ON u.username=v.username
-        WHERE v.announcement_id=@i::uuid ORDER BY v.viewed_at DESC
-      '''), parameters: {'i': id}));
+      final s3 = storeOf(cfg);
+      String? photoUrl(String? key) {
+        if (key == null || key.isEmpty || s3 == null) return null;
+        return cfg.s3avatarPublic ? s3.publicUrl(key) : s3.presignGet(key);
+      }
+
+      final v = await db.pool.runTx((tx) => tx.execute(
+          Sql.named('SELECT v.username, u.full_name, u.photo_key, v.viewed_at FROM announcement_views v '
+              'LEFT JOIN users u ON u.username=v.username '
+              'WHERE v.announcement_id=@i::uuid ORDER BY v.viewed_at DESC'),
+          parameters: {'i': id}));
       final seen = <String>{};
       final viewed = <Map<String, dynamic>>[];
       for (final row in v) {
@@ -196,12 +202,13 @@ Router announcementRouter(Db db, Config cfg) {
           'employee': {
             'username': m['username'],
             'fullName': m['full_name'] ?? m['username'],
+            'photoUrl': photoUrl(m['photo_key'] as String?),
           },
           'viewedAt': (m['viewed_at'] as DateTime).toIso8601String(),
         });
       }
       final rest = await db.pool.runTx((tx) => tx.execute(
-          Sql.named('SELECT username, full_name FROM users WHERE active ORDER BY full_name')));
+          Sql.named('SELECT username, full_name, photo_key FROM users WHERE active ORDER BY full_name')));
       final notViewed = <Map<String, dynamic>>[];
       for (final row in rest) {
         final m = row.toColumnMap();
@@ -209,6 +216,7 @@ Router announcementRouter(Db db, Config cfg) {
         notViewed.add({
           'username': m['username'],
           'fullName': m['full_name'],
+          'photoUrl': photoUrl(m['photo_key'] as String?),
         });
       }
       return json({'viewed': viewed, 'notViewed': notViewed});

@@ -69,6 +69,7 @@ class ReadReportSection extends StatelessWidget {
           for (final v in report.viewed)
             _PersonRow(
               name: v.employee.fullName,
+              photoUrl: v.employee.photoUrl,
               trailing: DateFormatId.shortDateTime(v.viewedAt),
             ),
         const SizedBox(height: AppSpacing.xl),
@@ -78,7 +79,7 @@ class ReadReportSection extends StatelessWidget {
           const _EmptyLine(text: 'Semua karyawan sudah melihat.')
         else
           for (final e in report.notViewed)
-            _PersonRow(name: e.fullName, muted: true),
+            _PersonRow(name: e.fullName, photoUrl: e.photoUrl, muted: true),
       ],
     );
   }
@@ -105,9 +106,15 @@ class _GroupLabel extends StatelessWidget {
 }
 
 class _PersonRow extends StatelessWidget {
-  const _PersonRow({required this.name, this.trailing, this.muted = false});
+  const _PersonRow({
+    required this.name,
+    this.photoUrl,
+    this.trailing,
+    this.muted = false,
+  });
 
   final String name;
+  final String? photoUrl;
   final String? trailing;
   final bool muted;
 
@@ -120,7 +127,7 @@ class _PersonRow extends StatelessWidget {
         padding: const EdgeInsets.symmetric(vertical: 6),
         child: Row(
           children: [
-            InitialsAvatar(name: name, size: 30, muted: muted),
+            PhotoAvatar(name: name, photoUrl: photoUrl, size: 30, muted: muted),
             const SizedBox(width: 12),
             Expanded(
               child: Text(

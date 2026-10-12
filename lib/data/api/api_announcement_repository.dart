@@ -43,6 +43,12 @@ class ApiAnnouncementRepository implements AnnouncementRepository {
 
   Map<String, dynamic> _map(Object? e) => Map<String, dynamic>.from(e as Map);
 
+  EmployeeRef _ref(Map<String, dynamic> m) => EmployeeRef(
+        username: (m['username'] ?? '').toString(),
+        fullName: (m['fullName'] ?? '').toString(),
+        photoUrl: m['photoUrl'] as String?,
+      );
+
   Division _div(Object? v) {
     for (final d in Division.values) {
       if (d.name == v) return d;
@@ -135,19 +141,12 @@ class ApiAnnouncementRepository implements AnnouncementRepository {
       viewed: [
         for (final e in (m['viewed'] as List? ?? []))
           AnnouncementViewer(
-            employee: EmployeeRef(
-              username: (_map(_map(e)['employee'])['username'] ?? '').toString(),
-              fullName: (_map(_map(e)['employee'])['fullName'] ?? '').toString(),
-            ),
+            employee: _ref(_map(_map(e)['employee'])),
             viewedAt: DateTime.tryParse((_map(e)['viewedAt'] ?? '').toString()) ?? DateTime.now(),
           ),
       ],
       notViewed: [
-        for (final e in (m['notViewed'] as List? ?? []))
-          EmployeeRef(
-            username: (_map(e)['username'] ?? '').toString(),
-            fullName: (_map(e)['fullName'] ?? '').toString(),
-          ),
+        for (final e in (m['notViewed'] as List? ?? [])) _ref(_map(e)),
       ],
     );
   }

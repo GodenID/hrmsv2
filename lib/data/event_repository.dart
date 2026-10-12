@@ -8,8 +8,7 @@ import 'auth_repository.dart';
 /// - Semua role: melihat event & mendaftarkan diri sebagai crew.
 /// - Manager & Super Admin: membuat, mengubah & menghapus event; mengelola
 ///   daftar kategori event; mengatur ambang nilai PO (kecil/sedang/besar).
-/// - Nilai PO hanya dikirim untuk Manager & Super Admin (Staff cukup
-///   melihat ukurannya).
+/// - Nilai PO terlihat semua role (keputusan produk).
 /// - Server mengingatkan crew pada hari-H event berlangsung.
 ///
 /// Implementasi WAJIB menegakkan aturan ini di server.

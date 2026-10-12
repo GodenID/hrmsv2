@@ -67,7 +67,6 @@ Router eventRouter(Db db, Config cfg) {
     return m;
   }
 
-  bool canViewPo(String role) => role == 'manager' || role == 'superadmin';
   bool canManage(String role) => role == 'manager' || role == 'superadmin';
 
   String? validateEvent(Map<String, dynamic> b) {
@@ -116,7 +115,8 @@ Router eventRouter(Db db, Config cfg) {
       'startDate': (e['start_date'] as DateTime).toIso8601String().substring(0, 10),
       'endDate': (e['end_date'] as DateTime).toIso8601String().substring(0, 10),
       'location': e['location'],
-      'poValue': canViewPo(viewer['role'] as String) ? po : null,
+      // Nilai PO terbuka untuk semua role (keputusan produk).
+      'poValue': po,
       'size': classify(po, thr),
       'createdBy': e['created_by'],
       'crew': [

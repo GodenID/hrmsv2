@@ -100,9 +100,9 @@ enum UserRole {
   bool get canManageEventThresholds =>
       this == UserRole.manager || this == UserRole.superadmin;
 
-  /// Melihat nilai PO event (data keuangan).
-  bool get canViewEventPo =>
-      this == UserRole.manager || this == UserRole.superadmin;
+  /// Melihat nilai PO event — kini terbuka semua role (keputusan produk).
+  /// Getter dipertahankan untuk kompatibilitas.
+  bool get canViewEventPo => true;
 
   /// Menyetujui / menolak cuti & koreksi absensi karyawan lain.
   bool get canReviewRequests =>

@@ -2,6 +2,42 @@ import 'package:flutter/material.dart';
 
 import '../theme/theme_colors.dart';
 
+/// Avatar bulat: foto profil bila ada, inisial nama bila tidak.
+class PhotoAvatar extends StatelessWidget {
+  const PhotoAvatar({
+    super.key,
+    required this.name,
+    this.photoUrl,
+    this.size = 34,
+    this.muted = false,
+  });
+
+  final String name;
+  final String? photoUrl;
+  final double size;
+  final bool muted;
+
+  @override
+  Widget build(BuildContext context) {
+    final url = photoUrl;
+    if (url == null || url.isEmpty) {
+      return InitialsAvatar(name: name, size: size, muted: muted);
+    }
+    return ExcludeSemantics(
+      child: ClipOval(
+        child: Image.network(
+          url,
+          width: size,
+          height: size,
+          fit: BoxFit.cover,
+          errorBuilder: (_, _, _) =>
+              InitialsAvatar(name: name, size: size, muted: muted),
+        ),
+      ),
+    );
+  }
+}
+
 /// Avatar bulat berisi inisial nama, mis. "Budi Santoso" -> "BS".
 class InitialsAvatar extends StatelessWidget {
   const InitialsAvatar({
