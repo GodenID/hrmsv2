@@ -275,10 +275,22 @@ class _SkipHintState extends State<_SkipHint> {
     return AnimatedOpacity(
       opacity: _opacity,
       duration: const Duration(milliseconds: 600),
-      child: const Text(
-        'Ketuk untuk lewati',
-        textAlign: TextAlign.center,
-        style: TextStyle(color: Colors.white54, fontSize: 12),
+      // Merah agar jelas bisa dilewati di atas video yang gelap/terang.
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.black45,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: const Text(
+          'Ketuk untuk lewati',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.redAccent,
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }
