@@ -275,21 +275,14 @@ class _SkipHintState extends State<_SkipHint> {
     return AnimatedOpacity(
       opacity: _opacity,
       duration: const Duration(milliseconds: 600),
-      // Merah agar jelas bisa dilewati di atas video yang gelap/terang.
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: Colors.black45,
-          borderRadius: BorderRadius.circular(20),
-        ),
-        child: const Text(
-          'Ketuk untuk lewati',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            color: Colors.redAccent,
-            fontSize: 12,
-            fontWeight: FontWeight.w700,
-          ),
+      // Teks polos merah di atas video (tanpa tombol/pil).
+      child: const Text(
+        'Ketuk untuk lewati',
+        textAlign: TextAlign.center,
+        style: TextStyle(
+          color: Colors.red,
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

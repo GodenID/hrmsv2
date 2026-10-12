@@ -13,7 +13,7 @@ import '../../data/app_exception.dart';
 import '../../data/attendance_repository.dart';
 import 'widgets/review_widgets.dart';
 
-/// Detail pengajuan luar-area untuk Manager: bukti posisi vs catatan
+/// Detail pengajuan luar-area untuk Atasan: bukti posisi vs catatan
 /// sistem hari itu. Pop dengan status baru bila diproses.
 class OutOfAreaReviewPage extends StatefulWidget {
   const OutOfAreaReviewPage({super.key, required this.item});

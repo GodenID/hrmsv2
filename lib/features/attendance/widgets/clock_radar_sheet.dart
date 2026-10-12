@@ -27,7 +27,7 @@ class ClockRadarResult {
 /// Lembar konfirmasi clock in / clock out dengan visual radar: titik
 /// lokasi absen + radiusnya, posisi pengguna, dan jarak keduanya.
 /// Di dalam radius → clock biasa; di luar radius → pengajuan luar area
-/// (butuh alasan, menunggu persetujuan Manager).
+/// (butuh alasan, menunggu persetujuan Atasan).
 Future<ClockRadarResult?> showClockRadarSheet(
   BuildContext context, {
   required AuthUser user,
@@ -312,7 +312,7 @@ class _ClockRadarSheetState extends State<_ClockRadarSheet> {
                         child: Text(
                           'Anda di luar area absen. Pengajuan ini baru '
                           'tercatat sebagai jam $actionLabel setelah '
-                          'disetujui Manager.',
+                          'disetujui Atasan.',
                           style: textTheme.bodySmall?.copyWith(height: 1.5),
                         ),
                       ),

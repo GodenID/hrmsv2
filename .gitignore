@@ -53,3 +53,8 @@ app.*.map.json
 key.properties
 .env
 server/.env
+# Konfig Firebase client (berisi API key project)
+google-services.json
+GoogleService-Info.plist
+# Service account Firebase (private key!) — hanya via env/secret manager
+*firebase-adminsdk*.json

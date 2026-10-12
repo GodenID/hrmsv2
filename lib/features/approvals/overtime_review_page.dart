@@ -13,7 +13,7 @@ import '../../data/app_exception.dart';
 import '../../data/overtime_repository.dart';
 import 'widgets/review_widgets.dart';
 
-/// Detail pengajuan lembur untuk Manager. Pop dengan status baru bila
+/// Detail pengajuan lembur untuk Atasan. Pop dengan status baru bila
 /// diproses.
 class OvertimeReviewPage extends StatefulWidget {
   const OvertimeReviewPage({super.key, required this.item});

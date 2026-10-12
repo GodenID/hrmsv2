@@ -13,7 +13,7 @@ import '../../data/app_exception.dart';
 import '../../data/attendance_repository.dart';
 import 'widgets/review_widgets.dart';
 
-/// Detail koreksi absensi untuk Manager: catatan sistem vs jam yang diajukan.
+/// Detail koreksi absensi untuk Atasan: catatan sistem vs jam yang diajukan.
 /// Pop dengan status baru bila diproses.
 class CorrectionReviewPage extends StatefulWidget {
   const CorrectionReviewPage({super.key, required this.item});

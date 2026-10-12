@@ -259,6 +259,7 @@ Router attendanceRouter(Db db, Config cfg) {
           throw const _Http(400, 'Anda sudah clock out hari ini.');
         }
         final (loc, _) = await requireInside(lat, lng, mocked, acc);
+        Map<String, dynamic> saved;
         if (isIn) {
           final ins = await tx.execute(Sql.named('''
             INSERT INTO attendance_records(user_id, date, clock_in, clock_in_location)
@@ -270,7 +271,7 @@ Router attendanceRouter(Db db, Config cfg) {
             'd': today.toIso8601String().substring(0, 10),
             'l': loc['name'],
           });
-          return ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+          saved = ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         } else {
           final upd = await tx.execute(Sql.named('''
             UPDATE attendance_records SET clock_out=now(), clock_out_location=@l
@@ -280,8 +281,21 @@ Router attendanceRouter(Db db, Config cfg) {
             'd': today.toIso8601String().substring(0, 10),
             'l': loc['name'],
           });
-          return upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+          saved = upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         }
+        // Clock biasa tercatat → pengajuan luar-area menunggu sisi sama
+        // batal otomatis (sudah tidak relevan).
+        await tx.execute(Sql.named('''
+          UPDATE out_of_area_requests SET status='cancelled',
+            reviewed_by='Sistem', reviewed_at=now(),
+            reviewer_note='Batal otomatis: clock biasa sudah tercatat.'
+          WHERE user_id=@i::uuid AND date=@d AND kind=@k AND status='pending'
+        '''), parameters: {
+          'i': (u['id'] as Object).toString(),
+          'd': today.toIso8601String().substring(0, 10),
+          'k': isIn ? 'clockIn' : 'clockOut',
+        });
+        return saved;
       });
       return json(recordJson(rec, today));
     } on _Http catch (h) {
@@ -637,7 +651,7 @@ Router attendanceRouter(Db db, Config cfg) {
           nearest = m['name'] as String;
         }
       }
-      final created = await db.pool.runTx((tx) async {
+      final result = await db.pool.runTx((tx) async {
         final rec = await tx.execute(Sql.named(
           'SELECT * FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
         ), parameters: {'i': (u['id'] as Object).toString(), 'd': today.toIso8601String().substring(0, 10)});
@@ -656,14 +670,35 @@ Router attendanceRouter(Db db, Config cfg) {
           throw const _Http(400, 'Silakan clock in terlebih dahulu.');
         }
         final dup = await tx.execute(Sql.named('''
-          SELECT 1 FROM out_of_area_requests
+          SELECT id FROM out_of_area_requests
           WHERE user_id=@i::uuid AND date=@d AND kind=@k AND status='pending'
         '''), parameters: {
           'i': (u['id'] as Object).toString(),
           'd': today.toIso8601String().substring(0, 10),
           'k': kind,
         });
-        if (dup.isNotEmpty) throw const _Http(400, 'Sudah ada pengajuan menunggu untuk sisi ini hari ini.');
+        // Sudah ada yang menunggu: perbarui (jam & posisi ikut sekarang)
+        // agar tidak terkunci menunggu.
+        if (dup.isNotEmpty) {
+          final upd = await tx.execute(Sql.named('''
+            UPDATE out_of_area_requests SET requested_at=now(), latitude=@la,
+              longitude=@lo, accuracy_meters=@ac, nearest_location=@nl,
+              distance_meters=@di, reason=@r, submitted_at=now()
+            WHERE id=@i::uuid RETURNING *
+          '''), parameters: {
+            'i': (dup.first.toColumnMap()['id'] as Object).toString(),
+            'la': lat,
+            'lo': lng,
+            'ac': acc,
+            'nl': nearest,
+            'di': best.isFinite ? best : 0,
+            'r': reason,
+          });
+          return (
+            row: upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v)),
+            updated: true,
+          );
+        }
         final ins = await tx.execute(Sql.named('''
           INSERT INTO out_of_area_requests(user_id, date, kind, latitude, longitude,
             accuracy_meters, nearest_location, distance_meters, reason)
@@ -687,9 +722,9 @@ Router attendanceRouter(Db db, Config cfg) {
               title: 'Pengajuan luar area baru',
               body: '${u['full_name']} mengajukan clock dari luar area.');
         }
-        return row;
+        return (row: row, updated: false);
       });
-      return json(ooaJson(created), status: 201);
+      return json(ooaJson(result.row), status: result.updated ? 200 : 201);
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }

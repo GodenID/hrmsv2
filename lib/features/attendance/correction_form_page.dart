@@ -133,7 +133,7 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
         title: 'Koreksi dikirim',
         message:
             'Pengajuan koreksi ${DateFormatId.shortDate(date)} terkirim. '
-            'Menunggu persetujuan Manager.',
+            'Menunggu persetujuan Atasan.',
       );
       if (mounted) Navigator.of(context).pop(true);
     } on AppException catch (e) {

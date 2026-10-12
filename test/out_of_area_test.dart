@@ -114,9 +114,27 @@ void main() {
       );
     });
 
-    test('satu sisi satu pengajuan menunggu', () async {
+    test('ajukan ulang sisi sama = diperbarui, bukan ditolak', () async {
+      final first = await submitIn();
+      now = now.add(const Duration(hours: 2));
+      final second = await submitIn(
+        reason: 'Masih di venue klien hingga siang.',
+      );
+      // ID sama, jam & alasan ikut waktu pengajuan terbaru.
+      expect(second.id, first.id);
+      expect(second.requestedAt, now);
+      expect(second.reason, 'Masih di venue klien hingga siang.');
+      expect(second.status, RequestStatus.pending);
+      final mine = await attendance.fetchMyOutOfArea(staff);
+      expect(mine.length, 1);
+    });
+
+    test('clock biasa membatalkan pengajuan menunggu sisi sama', () async {
       await submitIn();
-      await expectLater(submitIn(), attendanceError('masih menunggu'));
+      await attendance.clockIn(staff, position: inside);
+      final mine = await attendance.fetchMyOutOfArea(staff);
+      expect(mine.single.status, RequestStatus.cancelled);
+      expect((await attendance.fetchToday(staff)).clockIn, isNotNull);
     });
 
     test('clock out luar area butuh clock in dulu', () async {

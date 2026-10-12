@@ -302,7 +302,7 @@ class _DaySheet extends StatelessWidget {
   static String _whyNoCorrection(AttendanceDay day) {
     final today = WorkCalendar.dateOnly(DateTime.now());
     if (day.correction?.status == RequestStatus.pending) {
-      return 'Koreksi untuk tanggal ini sedang menunggu persetujuan Manager.';
+      return 'Koreksi untuk tanggal ini sedang menunggu persetujuan Atasan.';
     }
     if (day.status == AttendanceDayStatus.leave) {
       return 'Hari cuti/izin tidak memerlukan koreksi absensi.';

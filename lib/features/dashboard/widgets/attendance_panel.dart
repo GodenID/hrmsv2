@@ -138,7 +138,7 @@ class _AttendancePanelState extends State<AttendancePanel> {
             content: Text(
               'Pengajuan $label luar area pukul '
               '${DateFormatId.time(result.request!.requestedAt)} dikirim. '
-              'Jam tercatat setelah disetujui Manager.',
+              'Jam tercatat setelah disetujui Atasan.',
             ),
           ),
         );
@@ -199,7 +199,7 @@ class _AttendancePanelState extends State<AttendancePanel> {
                   r.status == RequestStatus.pending
                       ? 'Pengajuan ${r.kind.label} luar area pukul '
                             '${DateFormatId.time(r.requestedAt)} menunggu '
-                            'persetujuan Manager.'
+                            'persetujuan Atasan.'
                       : 'Pengajuan ${r.kind.label} luar area '
                             '${r.status.label.toLowerCase()}'
                             '${r.reviewerNote == null ? '.' : ': “${r.reviewerNote}”'}',

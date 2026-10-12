@@ -45,6 +45,30 @@ class MockAttendanceRepository implements AttendanceRepository {
     return _currentToday(user.username);
   }
 
+  /// Clock biasa tercatat → pengajuan luar-area yang masih menunggu untuk
+  /// sisi yang sama batal otomatis (sudah tidak relevan).
+  void _cancelPendingOutOfArea(String username, OutOfAreaKind kind) {
+    final list = store.outOfArea[username];
+    if (list == null) return;
+    var changed = false;
+    for (var i = 0; i < list.length; i++) {
+      final r = list[i];
+      if (r.kind == kind &&
+          r.status == RequestStatus.pending &&
+          WorkCalendar.isSameDay(r.date, _today)) {
+        list[i] = r.copyWith(
+          status: RequestStatus.cancelled,
+          reviewedBy: 'Sistem',
+          reviewedAt: store.now(),
+          reviewerNote:
+              'Batal otomatis: clock ${kind.label.toLowerCase()} biasa sudah tercatat.',
+        );
+        changed = true;
+      }
+    }
+    if (changed) store.attendanceChanges.ping();
+  }
+
   @override
   Future<AttendanceRecord> clockIn(
     AuthUser user, {
@@ -62,6 +86,7 @@ class MockAttendanceRepository implements AttendanceRepository {
       clockInLocation: place.name,
     );
     store.todayRecords[user.username] = updated;
+    _cancelPendingOutOfArea(user.username, OutOfAreaKind.clockIn);
     store.attendanceChanges.ping();
     return updated;
   }
@@ -88,6 +113,7 @@ class MockAttendanceRepository implements AttendanceRepository {
       clockOutLocation: place.name,
     );
     store.todayRecords[user.username] = updated;
+    _cancelPendingOutOfArea(user.username, OutOfAreaKind.clockOut);
     store.attendanceChanges.ping();
     return updated;
   }
@@ -761,18 +787,38 @@ class MockAttendanceRepository implements AttendanceRepository {
       );
     }
     final list = store.outOfArea.putIfAbsent(user.username, () => []);
-    if (list.any(
+    final nearest = _nearestLocation(position)!;
+    final existing = list.indexWhere(
       (r) =>
           WorkCalendar.isSameDay(r.date, _today) &&
           r.kind == kind &&
           r.status == RequestStatus.pending,
-    )) {
-      throw AppException(
-        'Pengajuan ${kind.label} luar area hari ini masih menunggu '
-        'persetujuan.',
+    );
+    // Sudah ada yang menunggu untuk sisi ini: perbarui (jam & posisi ikut
+    // waktu sekarang) alih-alih menolak, agar tidak terkunci menunggu.
+    if (existing >= 0) {
+      final old = list[existing];
+      final updated = OutOfAreaRequest(
+        id: old.id,
+        date: old.date,
+        kind: old.kind,
+        requestedAt: store.now(),
+        latitude: position.latitude,
+        longitude: position.longitude,
+        accuracyMeters: position.accuracyMeters,
+        nearestLocationName: nearest.name,
+        distanceMeters: nearest.distanceTo(
+          position.latitude,
+          position.longitude,
+        ),
+        reason: trimmed,
+        status: RequestStatus.pending,
+        submittedAt: store.now(),
       );
+      list[existing] = updated;
+      store.attendanceChanges.ping();
+      return updated;
     }
-    final nearest = _nearestLocation(position)!;
     final request = OutOfAreaRequest(
       id: store.nextId('OA'),
       date: _today,

@@ -15,7 +15,7 @@ import '../../data/app_exception.dart';
 import '../../data/leave_repository.dart';
 import 'widgets/review_widgets.dart';
 
-/// Detail pengajuan cuti/izin/sakit untuk Manager. Pop dengan status baru
+/// Detail pengajuan cuti/izin/sakit untuk Atasan. Pop dengan status baru
 /// ([RequestStatus.approved] / [RequestStatus.rejected]) bila diproses.
 class LeaveReviewPage extends StatefulWidget {
   const LeaveReviewPage({super.key, required this.item});
