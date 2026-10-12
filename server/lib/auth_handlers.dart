@@ -74,11 +74,10 @@ Router authRouter(Db db, Config cfg) {
     return json({'available': true});
   });
 
-  // ---- register: pendaftar pertama jadi superadmin otomatis ----
-  r.post('/auth/register', (Request req) async {
-    final b = await readJson(req);
-    String s(String k) => ((b[k] ?? '') as Object).toString();
-    final name = s('username').trim().toLowerCase();
+  Future<Response> _register(Db db, Config cfg, Request req) async {
+  final b = await readJson(req);
+  String s(String k) => ((b[k] ?? '') as Object).toString();
+  final name = s('username').trim().toLowerCase();
 
     String? fail(String? e, String field) =>
         e == null ? null : '$field:$e';
@@ -180,6 +179,22 @@ Router authRouter(Db db, Config cfg) {
       return json(out, status: 201);
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
+    }
+  }
+
+  // ---- register: pendaftar pertama jadi superadmin otomatis ----
+  r.post('/auth/register', (Request req) async {
+    try {
+      return await _register(db, cfg, req);
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    } catch (e, st) {
+      // Perangkap 500 misterius: catat detail ke log server (dashboard),
+      // klien terima JSON generik agar bisa ditampilkan.
+      print('REGISTER FAIL: $e\n$st');
+      return json(
+          {'message': 'Pendaftaran gagal diproses di server. Coba lagi.'},
+          status: 500);
     }
   });
 
