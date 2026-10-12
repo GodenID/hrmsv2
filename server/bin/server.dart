@@ -25,8 +25,23 @@ Future<void> runMigrations(Db db) async {
     ..sort((a, b) => a.path.compareTo(b.path));
   for (final f in files) {
     final sql = await f.readAsString();
-    await db.pool.runTx((tx) => tx.execute(sql));
-    stdout.writeln('migrated: ${f.path}');
+    // postgres driver menolak multi-statement per query: pecah per ';'.
+    // (Migrasi kita hanya DDL sederhana, tanpa fungsi/trigger ber-semicolon.)
+    final statements = <String>[];
+    for (final chunk in sql.split(';')) {
+      final lines = chunk
+          .split('\n')
+          .where((l) => !l.trimLeft().startsWith('--'))
+          .join('\n')
+          .trim();
+      if (lines.isNotEmpty) statements.add(lines);
+    }
+    await db.pool.runTx((tx) async {
+      for (final s in statements) {
+        await tx.execute(s);
+      }
+    });
+    stdout.writeln('migrated: ${f.path} (${statements.length} statements)');
   }
 }
 
