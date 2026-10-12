@@ -1,0 +1,45 @@
+# Prasasti Connect — lokal (dev) & pola deploy VPS.
+# Produksi di Coolify: pakai Dockerfile ./server + Postgres bawaan Coolify,
+# env diisi di dashboard Coolify (jangan commit .env).
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-prasasti}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-prasasti_dev}
+      POSTGRES_DB: ${POSTGRES_DB:-prasasti}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-prasasti}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build: ./server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      PORT: 8080
+      DATABASE_URL: postgres://${POSTGRES_USER:-prasasti}:${POSTGRES_PASSWORD:-prasasti_dev}@postgres:5432/${POSTGRES_DB:-prasasti}
+      JWT_SECRET: ${JWT_SECRET:-dev_min_32_karakter_acak_1234567890}
+      RUN_MIGRATIONS: ${RUN_MIGRATIONS:-true}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_BUCKET: ${S3_BUCKET:-}
+      S3_REGION: ${S3_REGION:-ap-southeast-1}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY:-}
+      S3_SECRET_KEY: ${S3_SECRET_KEY:-}
+      S3_PATH_STYLE: ${S3_PATH_STYLE:-false}
+      S3_AVATAR_PUBLIC: ${S3_AVATAR_PUBLIC:-true}
+
+volumes:
+  pgdata:
