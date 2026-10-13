@@ -503,6 +503,34 @@ Router employeeRouter(Db db, Config cfg) {
     }
   });
 
+  r.delete('/employees/<username>', (Request req, String username) async {
+    try {
+      final actor = await requireSuperAdmin(req);
+      final name = username.trim().toLowerCase();
+      await db.pool.runTx((tx) async {
+        final cur = await tx.execute(
+          Sql.named('SELECT * FROM users WHERE username=@u'),
+          parameters: {'u': name},
+        );
+        if (cur.isEmpty) throw const _Http(404, 'Karyawan tidak ditemukan.');
+        final old = cur.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        if ((old['username'] as String) == actor['username']) {
+          throw const _Http(403, 'Anda tidak dapat menghapus akun Anda sendiri.');
+        }
+        if (!canManageRole(actor['role'] as String, old['role'] as String)) {
+          throw _Http(403, ' tidak dapat menghapus akun .');
+        }
+        await tx.execute(
+          Sql.named('DELETE FROM users WHERE username=@u'),
+          parameters: {'u': name},
+        );
+      });
+      return json({'ok': true});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
   r.post('/employees/<username>/reset-password', (Request req, String username) async {
     try {
       final actor = await requireSuperAdmin(req);

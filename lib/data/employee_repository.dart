@@ -58,6 +58,11 @@ abstract class EmployeeRepository {
     required bool active,
   });
 
+  Future<void> deleteEmployee(
+    AuthUser actor, {
+    required String username,
+  });
+
   /// Mengganti password dengan password sementara baru (ditampilkan sekali
   /// ke Manager untuk diserahkan ke karyawan).
   Future<String> resetPassword(AuthUser actor, {required String username});

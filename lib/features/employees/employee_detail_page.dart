@@ -138,6 +138,28 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
     }
   }
 
+  Future<void> _delete() async {
+    final e = _employee;
+    final ok = await _confirm(
+      title: 'Hapus akun permanen?',
+      message:
+          '${e.fullName} akan dihapus sepenuhnya, termasuk riwayat absensi '
+          'dan cutinya. Tindakan ini tidak bisa dibatalkan.',
+      action: 'Hapus permanen',
+      danger: true,
+    );
+    if (!ok || !mounted) return;
+    await _run(() async {
+      await _repo.deleteEmployee(
+        SessionScope.userOf(context),
+        username: e.username,
+      );
+      if (!mounted) return;
+      showAppSnackBar(context, 'Akun karyawan dihapus permanen.');
+      Navigator.of(context).pop(true);
+    });
+  }
+
   Future<void> _resetPassword() async {
     final e = _employee;
     final ok = await _confirm(
@@ -229,6 +251,12 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
               onPressed: _isBusy ? null : _edit,
               icon: const Icon(Icons.edit_outlined, size: 18),
               label: const Text('Ubah'),
+            ),
+          if (me.role == UserRole.superadmin && !isSelf)
+            IconButton(
+              tooltip: 'Hapus permanen',
+              onPressed: _isBusy ? null : _delete,
+              icon: const Icon(Icons.delete_forever_outlined),
             ),
         ],
         child: Column(

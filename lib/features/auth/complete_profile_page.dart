@@ -173,34 +173,25 @@ class _CompleteProfilePageState extends State<CompleteProfilePage> {
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 2,
-                        child: TextFormField(
-                          controller: _birthPlaceController,
-                          textCapitalization: TextCapitalization.words,
-                          validator: RegistrationRules.validateBirthPlace,
-                          decoration: const InputDecoration(
-                            labelText: 'Tempat lahir',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.md),
-                      Expanded(
-                        child: LabeledField(
-                          label: 'Tgl. lahir',
-                          child: PickerField(
-                            valueText: _birthDate == null
-                                ? null
-                                : DateFormatId.shortDate(_birthDate!),
-                            hint: 'Pilih',
-                            icon: Icons.event_outlined,
-                            onTap: _pickBirthDate,
-                          ),
-                        ),
-                      ),
-                    ],
+                  TextFormField(
+                    controller: _birthPlaceController,
+                    textCapitalization: TextCapitalization.words,
+                    validator: RegistrationRules.validateBirthPlace,
+                    decoration: const InputDecoration(
+                      labelText: 'Tempat lahir',
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                  LabeledField(
+                    label: 'Tgl. lahir',
+                    child: PickerField(
+                      valueText: _birthDate == null
+                          ? null
+                          : DateFormatId.shortDate(_birthDate!),
+                      hint: 'Pilih',
+                      icon: Icons.event_outlined,
+                      onTap: _pickBirthDate,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   DropdownButtonFormField<Gender>(

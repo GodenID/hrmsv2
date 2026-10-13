@@ -257,6 +257,18 @@ class ApiEmployeeRepository implements EmployeeRepository {
   }
 
   @override
+  Future<void> deleteEmployee(AuthUser actor, {required String username}) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/employees/$username'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200 && res.statusCode != 204) {
+      _throw(res.body, res.statusCode);
+    }
+    _ping();
+  }
+
+  @override
   Future<String> resetPassword(AuthUser actor, {required String username}) async {
     final res = await _client.post(
       Uri.parse('$_base/employees/$username/reset-password'),

@@ -260,6 +260,22 @@ class MockEmployeeRepository implements EmployeeRepository {
     }
     return _toAccount(actor, a);
   }
+  @override
+  Future<void> deleteEmployee(AuthUser actor, {required String username}) async {
+    await Future<void>.delayed(latency);
+    _requireSuperAdmin(actor);
+    final name = username.trim().toLowerCase();
+    final a = store.account(name);
+    if (a == null) {
+      throw const AppException('Karyawan tidak ditemukan.');
+    }
+    if (a.username == actor.username) {
+      throw const AppException('Anda tidak dapat menghapus akun Anda sendiri.');
+    }
+    store.accounts.remove(name);
+    store.employeeChanges.ping();
+  }
+
 
   @override
   Future<EmployeeCreated> createEmployee(
