@@ -456,8 +456,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         SegmentToggle(
           options: [
             'Cuti & izin (${leavePending.length})',
-            'Koreksi (${corrPending.length})',
-            'Luar area (${oaPending.length})',
+            'Koreksi Absensi (${corrPending.length})',
+            'Absensi Luar Area (${oaPending.length})',
             'Lembur (${otPending.length})',
           ],
           selectedIndex: _tab,
@@ -809,7 +809,7 @@ class _OutOfAreaRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = item.request;
     final title =
-        '${r.kind.label} luar area  ·  ${DateFormatId.time(r.requestedAt)}  ·  '
+        '${r.kind.label} Absensi Luar Area  ·  ${DateFormatId.time(r.requestedAt)}  ·  '
         '${GeoMath.formatDistance(r.distanceMeters)} dari '
         '${r.nearestLocationName}';
     final subtitle = 'Diajukan ${DateFormatId.shortDateTime(r.submittedAt)}';
@@ -822,7 +822,7 @@ class _OutOfAreaRow extends StatelessWidget {
       checked: checked,
       onChecked: onChecked,
       semanticLabel:
-          '${item.employee.fullName}, pengajuan ${r.kind.label} luar area '
+          '${item.employee.fullName}, pengajuan ${r.kind.label} Absensi Luar Area '
           'pukul ${DateFormatId.time(r.requestedAt)}, '
           '${GeoMath.formatDistance(r.distanceMeters)} dari '
           '${r.nearestLocationName}. Status ${r.status.label}',
@@ -893,7 +893,7 @@ class _CorrectionRow extends StatelessWidget {
         '${DateFormatId.time(c.clockIn)} – ${DateFormatId.time(c.clockOut)}';
     return _ReviewRow(
       name: item.employee.fullName,
-      title: 'Koreksi $date  ·  $times',
+      title: 'Koreksi Absensi $date  ·  $times',
       subtitle: 'Diajukan ${DateFormatId.shortDateTime(c.submittedAt)}',
       status: c.status,
       showCheckbox: showCheckbox,

@@ -671,7 +671,7 @@ Router attendanceRouter(Db db, Config cfg) {
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
         SELECT c.*, u.username, u.full_name, u.role AS urel
         FROM attendance_corrections c JOIN users u ON u.id=c.user_id
-        WHERE c.status='pending' AND u.username<>@me ORDER BY c.submitted_at
+        WHERE c.status<>'cancelled' AND u.username<>@me ORDER BY c.submitted_at
       '''), parameters: {'me': actor['username']}));
       final items = <Map<String, dynamic>>[];
       for (final row in rows) {
@@ -918,7 +918,7 @@ Router attendanceRouter(Db db, Config cfg) {
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
         SELECT o.*, u.username, u.full_name, u.role AS urel
         FROM out_of_area_requests o JOIN users u ON u.id=o.user_id
-        WHERE o.status='pending' ORDER BY o.submitted_at
+        WHERE o.status<>'cancelled' ORDER BY o.submitted_at
       ''')));
       final items = <Map<String, dynamic>>[];
       final selfApprove =
