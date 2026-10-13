@@ -822,6 +822,17 @@ Router attendanceRouter(Db db, Config cfg) {
         }
       }
       final result = await db.pool.runTx((tx) async {
+        final dup = await tx.execute(Sql.named('''
+          SELECT id FROM out_of_area_requests
+          WHERE user_id=@i::uuid AND date=@d AND status<>'cancelled'
+        '''), parameters: {
+          'i': (u['id'] as Object).toString(),
+          'd': today.toIso8601String().substring(0, 10),
+        });
+        // Satu hari satu pengajuan: cegah dobel agar status tidak rancu.
+        if (dup.isNotEmpty) {
+          throw const _Http(400, 'Sudah ada pengajuan luar area hari ini.');
+        }
         final eff = await effectiveSides(
             tx, (u['id'] as Object).toString(), today.toIso8601String().substring(0, 10));
         if (kind == 'clockIn' && eff.ci != null) {
@@ -832,36 +843,6 @@ Router attendanceRouter(Db db, Config cfg) {
         }
         if (kind == 'clockOut' && eff.co != null) {
           throw const _Http(400, 'Jam pulang hari ini sudah tercatat.');
-        }
-        final dup = await tx.execute(Sql.named('''
-          SELECT id FROM out_of_area_requests
-          WHERE user_id=@i::uuid AND date=@d AND kind=@k AND status='pending'
-        '''), parameters: {
-          'i': (u['id'] as Object).toString(),
-          'd': today.toIso8601String().substring(0, 10),
-          'k': kind,
-        });
-        // Sudah ada yang menunggu: perbarui (jam & posisi ikut sekarang)
-        // agar tidak terkunci menunggu.
-        if (dup.isNotEmpty) {
-          final upd = await tx.execute(Sql.named('''
-            UPDATE out_of_area_requests SET requested_at=now(), latitude=@la,
-              longitude=@lo, accuracy_meters=@ac, nearest_location=@nl,
-              distance_meters=@di, reason=@r, submitted_at=now()
-            WHERE id=@i::uuid RETURNING *
-          '''), parameters: {
-            'i': (dup.first.toColumnMap()['id'] as Object).toString(),
-            'la': lat,
-            'lo': lng,
-            'ac': acc,
-            'nl': nearest,
-            'di': best.isFinite ? best : 0,
-            'r': reason,
-          });
-          return (
-            row: upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v)),
-            updated: true,
-          );
         }
         final ins = await tx.execute(Sql.named('''
           INSERT INTO out_of_area_requests(user_id, date, kind, latitude, longitude,

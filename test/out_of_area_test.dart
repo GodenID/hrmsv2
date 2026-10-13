@@ -114,17 +114,15 @@ void main() {
       );
     });
 
-    test('ajukan ulang sisi sama = diperbarui, bukan ditolak', () async {
-      final first = await submitIn();
+    test('pengajuan kedua di hari yang sama ditolak', () async {
+      await submitIn();
       now = now.add(const Duration(hours: 2));
-      final second = await submitIn(
-        reason: 'Masih di venue klien hingga siang.',
+      await expectLater(
+        submitIn(
+          reason: 'Masih di venue klien hingga siang.',
+        ),
+        attendanceError('Sudah ada pengajuan'),
       );
-      // ID sama, jam & alasan ikut waktu pengajuan terbaru.
-      expect(second.id, first.id);
-      expect(second.requestedAt, now);
-      expect(second.reason, 'Masih di venue klien hingga siang.');
-      expect(second.status, RequestStatus.pending);
       final mine = await attendance.fetchMyOutOfArea(staff);
       expect(mine.length, 1);
     });
@@ -149,22 +147,24 @@ void main() {
       );
     });
 
-    test('jam yang disetujui diakui validasi sisi', () async {
-      // Clock in disetujui (luar area) -> clock out boleh diajukan
-      // maupun dicatat biasa, tanpa "clock in dulu".
+    test('sudah ada yang disetujui = sisi lain ikut ditolak', () async {
       final request = await submitIn();
       await attendance.reviewOutOfArea(
         manager,
         id: request.id,
         approve: true,
       );
-      final out = await attendance.submitOutOfArea(
-        staff,
-        kind: OutOfAreaKind.clockOut,
-        position: outside,
-        reason: 'Pulang dari venue klien sore ini.',
+      // Satu hari satu pengajuan: clock out luar area ikut tertolak,
+      // clock out biasa tetap bisa karena clock in sudah tercatat.
+      await expectLater(
+        attendance.submitOutOfArea(
+          staff,
+          kind: OutOfAreaKind.clockOut,
+          position: outside,
+          reason: 'Pulang dari venue klien sore ini.',
+        ),
+        attendanceError('Sudah ada pengajuan'),
       );
-      expect(out.status, RequestStatus.pending);
       final record = await attendance.clockOut(staff, position: inside);
       expect(record.clockOut, isNotNull);
     });
@@ -278,18 +278,19 @@ void main() {
   group('antrean', () {
     test('menunggu dulu, yang sudah diproses belakangan', () async {
       final first = await submitIn();
-      await attendance.reviewOutOfArea(manager, id: first.id, approve: true);
-      // Pengajuan kedua untuk sisi satunya (clock out): clock in sudah ada.
-      await attendance.submitOutOfArea(
-        staff,
-        kind: OutOfAreaKind.clockOut,
-        position: outside,
-        reason: 'Pulang dari venue klien sore ini.',
+      // Dobel di hari yang sama ditolak dulu.
+      await expectLater(
+        attendance.submitOutOfArea(
+          staff,
+          kind: OutOfAreaKind.clockOut,
+          position: outside,
+          reason: 'Pulang dari venue klien sore ini.',
+        ),
+        attendanceError('Sudah ada pengajuan'),
       );
+      await attendance.reviewOutOfArea(manager, id: first.id, approve: true);
       final queue = await attendance.fetchOutOfAreaQueue(manager);
-      expect(queue.first.request.status, RequestStatus.pending);
-      expect(queue.first.request.kind, OutOfAreaKind.clockOut);
-      expect(queue.last.request.status, RequestStatus.approved);
+      expect(queue.single.request.status, RequestStatus.approved);
     });
   });
 }

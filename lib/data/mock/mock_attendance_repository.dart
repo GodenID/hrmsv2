@@ -885,6 +885,18 @@ class MockAttendanceRepository implements AttendanceRepository {
         'Alasan minimal ${OutOfAreaRules.minReasonLength} karakter.',
       );
     }
+    final list = store.outOfArea.putIfAbsent(user.username, () => []);
+    final alreadySubmitted = list.any(
+      (r) =>
+          WorkCalendar.isSameDay(r.date, _today) &&
+          r.status != RequestStatus.cancelled,
+    );
+    // Satu hari satu pengajuan: cegah dobel agar status tidak rancu.
+    if (alreadySubmitted) {
+      throw const AppException(
+        'Sudah ada pengajuan luar area hari ini.',
+      );
+    }
     final isIn = kind == OutOfAreaKind.clockIn;
     final eff = _effectiveToday(user.username);
     if (isIn && eff.$1 != null) {
@@ -899,39 +911,7 @@ class MockAttendanceRepository implements AttendanceRepository {
     if (!isIn && eff.$2 != null) {
       throw const AppException('Jam clock out hari ini sudah tercatat.');
     }
-    final list = store.outOfArea.putIfAbsent(user.username, () => []);
     final nearest = _nearestLocation(position)!;
-    final existing = list.indexWhere(
-      (r) =>
-          WorkCalendar.isSameDay(r.date, _today) &&
-          r.kind == kind &&
-          r.status == RequestStatus.pending,
-    );
-    // Sudah ada yang menunggu untuk sisi ini: perbarui (jam & posisi ikut
-    // waktu sekarang) alih-alih menolak, agar tidak terkunci menunggu.
-    if (existing >= 0) {
-      final old = list[existing];
-      final updated = OutOfAreaRequest(
-        id: old.id,
-        date: old.date,
-        kind: old.kind,
-        requestedAt: store.now(),
-        latitude: position.latitude,
-        longitude: position.longitude,
-        accuracyMeters: position.accuracyMeters,
-        nearestLocationName: nearest.name,
-        distanceMeters: nearest.distanceTo(
-          position.latitude,
-          position.longitude,
-        ),
-        reason: trimmed,
-        status: RequestStatus.pending,
-        submittedAt: store.now(),
-      );
-      list[existing] = updated;
-      store.attendanceChanges.ping();
-      return updated;
-    }
     final request = OutOfAreaRequest(
       id: store.nextId('OA'),
       date: _today,
