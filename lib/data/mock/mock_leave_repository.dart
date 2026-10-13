@@ -19,6 +19,23 @@ class MockLeaveRepository implements LeaveRepository {
 
   @override
   Listenable get changes => store.leaveChanges;
+  @override
+  Future<void> delete(AuthUser actor, {required String id}) async {
+    await Future<void>.delayed(latency);
+    if (actor.role != UserRole.superadmin) {
+      throw const PermissionDeniedException(
+        'Hanya Super Admin yang dapat menghapus riwayat.',
+      );
+    }
+    for (final entry in store.leaveRequests.entries) {
+      final idx = entry.value.indexWhere((r) => r.id == id);
+      if (idx >= 0) {
+        entry.value.removeAt(idx);
+        store.leaveChanges.ping();
+        break;
+      }
+    }
+  }
 
   List<LeaveRequest> _list(AuthUser user) => _listOf(user.username);
 

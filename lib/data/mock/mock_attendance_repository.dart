@@ -28,6 +28,46 @@ class MockAttendanceRepository implements AttendanceRepository {
   @override
   Listenable get changes => store.attendanceChanges;
 
+  @override
+  Future<void> deleteCorrection(AuthUser actor, {required String id}) async {
+    await Future<void>.delayed(latency);
+    if (actor.role != UserRole.superadmin) {
+      throw const PermissionDeniedException(
+        'Hanya Super Admin yang dapat menghapus riwayat.',
+      );
+    }
+    for (final user in store.corrections.keys.toList()) {
+      final list = store.corrections[user]!;
+      final idx = list.indexWhere((c) => c.id == id);
+      if (idx >= 0) {
+        list.removeAt(idx);
+        store.corrections[user] = list;
+        store.attendanceChanges.ping();
+        break;
+      }
+    }
+  }
+
+  @override
+  Future<void> deleteOutOfArea(AuthUser actor, {required String id}) async {
+    await Future<void>.delayed(latency);
+    if (actor.role != UserRole.superadmin) {
+      throw const PermissionDeniedException(
+        'Hanya Super Admin yang dapat menghapus riwayat.',
+      );
+    }
+    for (final user in store.outOfArea.keys.toList()) {
+      final list = store.outOfArea[user]!;
+      final idx = list.indexWhere((r) => r.id == id);
+      if (idx >= 0) {
+        list.removeAt(idx);
+        store.outOfArea[user] = list;
+        store.attendanceChanges.ping();
+        break;
+      }
+    }
+  }
+
   DateTime get _today => WorkCalendar.dateOnly(store.now());
 
   AttendanceRecord _currentToday(String username) {

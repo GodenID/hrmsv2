@@ -1067,5 +1067,42 @@ Router attendanceRouter(Db db, Config cfg) {
     }
   });
 
+  r.delete('/attendance/corrections/<id>', (Request req, String id) async {
+    try {
+      final actor = await me(req);
+      if (actor['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat menghapus riwayat.');
+      }
+      await db.pool.runTx((tx) async {
+        final cur = await tx.execute(Sql.named(
+            'SELECT 1 FROM attendance_corrections WHERE id=@i::uuid'), parameters: {'i': id});
+        if (cur.isEmpty) throw const _Http(404, 'Pengajuan tidak ditemukan.');
+        await tx.execute(Sql.named(
+            'DELETE FROM attendance_corrections WHERE id=@i::uuid'), parameters: {'i': id});
+      });
+      return json({'ok': true});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.delete('/attendance/out-of-area/<id>', (Request req, String id) async {
+    try {
+      final actor = await me(req);
+      if (actor['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat menghapus riwayat.');
+      }
+      await db.pool.runTx((tx) async {
+        final cur = await tx.execute(Sql.named(
+            'SELECT 1 FROM out_of_area_requests WHERE id=@i::uuid'), parameters: {'i': id});
+        if (cur.isEmpty) throw const _Http(404, 'Pengajuan tidak ditemukan.');
+        await tx.execute(Sql.named(
+            'DELETE FROM out_of_area_requests WHERE id=@i::uuid'), parameters: {'i': id});
+      });
+      return json({'ok': true});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
   return r;
 }

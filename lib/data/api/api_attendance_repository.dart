@@ -371,6 +371,17 @@ class ApiAttendanceRepository implements AttendanceRepository {
     );
   }
 
+
+  @override
+  Future<void> deleteCorrection(AuthUser actor, {required String id}) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/attendance/corrections/$id'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200 && res.statusCode != 204) _throw(res.body, res.statusCode);
+    _ping();
+  }
+
   @override
   Future<AttendanceCorrection> cancelCorrection(AuthUser user, {required String id}) async {
     final res = await _client.post(
@@ -459,6 +470,16 @@ class ApiAttendanceRepository implements AttendanceRepository {
     );
   }
 
+
+  @override
+  Future<void> deleteOutOfArea(AuthUser actor, {required String id}) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/attendance/out-of-area/$id'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200 && res.statusCode != 204) _throw(res.body, res.statusCode);
+    _ping();
+  }
   @override
   Future<OutOfAreaRequest> cancelOutOfArea(AuthUser user, {required String id}) async {
     final res = await _client.post(

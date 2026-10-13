@@ -201,6 +201,18 @@ class ApiLeaveRepository implements LeaveRepository {
     _ping();
     return _item(jsonDecode(res.body) as Map<String, dynamic>);
   }
+  @override
+  Future<void> delete(AuthUser actor, {required String id}) async {
+    final res = await _client.delete(
+    Uri.parse('$_base/leave/requests/$id'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200 && res.statusCode != 204) {
+      _throw(res.body, res.statusCode);
+    }
+    _ping();
+  }
+
 
   @override
   Future<List<CollectiveLeaveResult>> applyCollectiveLeave(

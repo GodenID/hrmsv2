@@ -116,6 +116,8 @@ abstract class AttendanceRepository {
     required bool approve,
     String? note,
   });
+  Future<void> deleteCorrection(AuthUser actor, {required String id});
+  Future<void> deleteOutOfArea(AuthUser actor, {required String id});
 
   /// Membatalkan pengajuan luar-area milik sendiri. Hanya yang menunggu.
   Future<OutOfAreaRequest> cancelOutOfArea(

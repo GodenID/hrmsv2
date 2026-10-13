@@ -55,5 +55,7 @@ abstract class OvertimeRepository {
     required bool approve,
     String? note,
   });
+
+  Future<void> delete(AuthUser actor, {required String id});
 }
 

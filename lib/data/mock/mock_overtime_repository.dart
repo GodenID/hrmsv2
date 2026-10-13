@@ -22,6 +22,25 @@ class MockOvertimeRepository implements OvertimeRepository {
   @override
   Listenable get changes => store.overtimeChanges;
 
+  @override
+  Future<void> delete(AuthUser actor, {required String id}) async {
+    await Future<void>.delayed(latency);
+    if (actor.role != UserRole.superadmin) {
+      throw const PermissionDeniedException(
+        'Hanya Super Admin yang dapat menghapus riwayat.',
+      );
+    }
+    for (final key in store.overtimeRequests.keys.toList()) {
+      final list = store.overtimeRequests[key]!;
+      final idx = list.indexWhere((r) => r.id == id);
+      if (idx >= 0) {
+        list.removeAt(idx);
+        store.overtimeChanges.ping();
+        break;
+      }
+    }
+  }
+
   DateTime get _today => WorkCalendar.dateOnly(store.now());
 
   List<OvertimeRequest> _list(String username) =>

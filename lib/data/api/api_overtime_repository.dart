@@ -165,4 +165,15 @@ class ApiOvertimeRepository implements OvertimeRepository {
       request: _req(_map(m['request'])),
     );
   }
+
+  @override
+  Future<void> delete(AuthUser actor, {required String id}) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/overtime/requests/$id'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200 && res.statusCode != 204) _throw(res.body, res.statusCode);
+    _ping();
+  }
+
 }

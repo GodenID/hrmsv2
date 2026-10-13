@@ -48,6 +48,9 @@ abstract class LeaveRepository {
     String? note,
   });
 
+  /// Hapus riwayat pengajuan (khusus Super Admin).
+  Future<void> delete(AuthUser actor, {required String id});
+
   /// Memotong cuti tahunan banyak karyawan sekaligus untuk cuti bersama.
   /// Hanya Super Admin. Untuk tiap karyawan dibuatkan pengajuan cuti
   /// tahunan berstatus disetujui. Jumlah hari = hari kerja Senin–Jumat

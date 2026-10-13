@@ -91,6 +91,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   bool get _canBulk =>
       SessionScope.userOf(context).role == UserRole.superadmin;
 
+  bool get _canDeleteHistory =>
+      SessionScope.userOf(context).role == UserRole.superadmin;
+
   bool _matchesName(String fullName, String q) {
     if (q.isEmpty) return true;
     return fullName.toLowerCase().contains(q);
@@ -319,6 +322,63 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     await _load();
   }
 
+  Future<void> _deleteHistory({
+    required int tab,
+    required String id,
+    required String name,
+  }) async {
+    if (_isProcessing) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus riwayat?'),
+        content: Text(
+          'Riwayat pengajuan  akan dihapus permanen dan tidak '
+          'tampil lagi di daftar ini.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+    setState(() => _isProcessing = true);
+    try {
+      final user = SessionScope.userOf(context);
+      switch (tab) {
+        case 0:
+          await _leave.delete(user, id: id);
+        case 1:
+          await _attendance.deleteCorrection(user, id: id);
+        case 2:
+          await _attendance.deleteOutOfArea(user, id: id);
+        default:
+          await _overtime.delete(user, id: id);
+      }
+      if (!mounted) return;
+      showAppSnackBar(context, 'Riwayat  dihapus.');
+      await _load();
+    } on AppException catch (e) {
+      if (mounted) showAppSnackBar(context, e.message);
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          'Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageScaffold(
@@ -414,13 +474,6 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
           _inHistoryRange(i.request.submittedAt))
         i,
   ];
-
-  int get _activePendingCount => switch (_tab) {
-    0 => _leavePending.length,
-    1 => _corrPending.length,
-    2 => _oaPending.length,
-    _ => _otPending.length,
-  };
 
   int get _activeDoneCount => switch (_tab) {
     0 => _leaveDone.length,
@@ -552,8 +605,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         const SizedBox(height: AppSpacing.lg),
          SegmentToggle(
            options: [
-             'Menunggu (${_activePendingCount})',
-             'Riwayat (${_activeDoneCount})',
+              'Menunggu ()',
+              'Riwayat ()',
            ],
            selectedIndex: _historyPane,
            onSelect: (i) => setState(() {
@@ -654,7 +707,17 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
            section<LeaveReviewItem>(
              label: 'Riwayat persetujuan',
              items: _paged(leaveDone),
-             row: (i) => _LeaveRow(item: i, onTap: () => _openLeave(i)),
+              row: (i) => _LeaveRow(
+                item: i,
+                onTap: () => _openLeave(i),
+                onDelete: _canDeleteHistory
+                    ? () => _deleteHistory(
+                        tab: 0,
+                        id: i.request.id,
+                        name: i.employee.fullName,
+                      )
+                    : null,
+              ),
              emptyTitle: 'Tidak ada riwayat',
              emptyMessage:
                  'Riwayat cuti/izin pada rentang tanggal dan nama ini tidak ditemukan.',
@@ -663,8 +726,17 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
            section<CorrectionReviewItem>(
              label: 'Riwayat persetujuan',
              items: _paged(corrDone),
-             row: (i) =>
-                 _CorrectionRow(item: i, onTap: () => _openCorrection(i)),
+              row: (i) => _CorrectionRow(
+                item: i,
+                onTap: () => _openCorrection(i),
+                onDelete: _canDeleteHistory
+                    ? () => _deleteHistory(
+                        tab: 1,
+                        id: i.correction.id,
+                        name: i.employee.fullName,
+                      )
+                    : null,
+              ),
              emptyTitle: 'Tidak ada riwayat',
              emptyMessage:
                  'Koreksi absensi pada rentang tanggal dan nama ini tidak ditemukan.',
@@ -673,7 +745,17 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
            section<OutOfAreaReviewItem>(
              label: 'Riwayat persetujuan',
              items: _paged(oaDone),
-             row: (i) => _OutOfAreaRow(item: i, onTap: () => _openOutOfArea(i)),
+              row: (i) => _OutOfAreaRow(
+                item: i,
+                onTap: () => _openOutOfArea(i),
+                onDelete: _canDeleteHistory
+                    ? () => _deleteHistory(
+                        tab: 2,
+                        id: i.request.id,
+                        name: i.employee.fullName,
+                      )
+                    : null,
+              ),
              emptyTitle: 'Tidak ada riwayat',
              emptyMessage:
                  'Pengajuan absensi luar area pada rentang tanggal dan nama ini tidak ditemukan.',
@@ -682,7 +764,17 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
            section<OvertimeReviewItem>(
              label: 'Riwayat persetujuan',
              items: _paged(otDone),
-             row: (i) => _OvertimeRow(item: i, onTap: () => _openOvertime(i)),
+              row: (i) => _OvertimeRow(
+                item: i,
+                onTap: () => _openOvertime(i),
+                onDelete: _canDeleteHistory
+                    ? () => _deleteHistory(
+                        tab: 3,
+                        id: i.request.id,
+                        name: i.employee.fullName,
+                      )
+                    : null,
+              ),
              emptyTitle: 'Tidak ada riwayat',
              emptyMessage:
                  'Pengajuan lembur pada rentang tanggal dan nama ini tidak ditemukan.',
@@ -802,6 +894,7 @@ class _ReviewRow extends StatelessWidget {
     this.showCheckbox = false,
     this.checked = false,
     this.onChecked,
+    this.onDelete,
   });
 
   final String name;
@@ -815,6 +908,7 @@ class _ReviewRow extends StatelessWidget {
   final bool showCheckbox;
   final bool checked;
   final ValueChanged<bool?>? onChecked;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -889,6 +983,7 @@ class _LeaveRow extends StatelessWidget {
     this.showCheckbox = false,
     this.checked = false,
     this.onChecked,
+    this.onDelete,
   });
 
   final LeaveReviewItem item;
@@ -896,6 +991,7 @@ class _LeaveRow extends StatelessWidget {
   final bool showCheckbox;
   final bool checked;
   final ValueChanged<bool?>? onChecked;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -911,6 +1007,7 @@ class _LeaveRow extends StatelessWidget {
       showCheckbox: showCheckbox,
       checked: checked,
       onChecked: onChecked,
+      onDelete: onDelete,
       semanticLabel:
           '${item.employee.fullName}, ${r.type.label} ${r.workingDays} hari, '
           '$range. Status ${r.status.label}',
@@ -926,6 +1023,7 @@ class _OutOfAreaRow extends StatelessWidget {
     this.showCheckbox = false,
     this.checked = false,
     this.onChecked,
+    this.onDelete,
   });
 
   final OutOfAreaReviewItem item;
@@ -933,6 +1031,7 @@ class _OutOfAreaRow extends StatelessWidget {
   final bool showCheckbox;
   final bool checked;
   final ValueChanged<bool?>? onChecked;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -950,6 +1049,7 @@ class _OutOfAreaRow extends StatelessWidget {
       showCheckbox: showCheckbox,
       checked: checked,
       onChecked: onChecked,
+      onDelete: onDelete,
       semanticLabel:
           '${item.employee.fullName}, pengajuan ${r.kind.label} Absensi Luar Area '
           'pukul ${DateFormatId.time(r.requestedAt)}, '
@@ -967,6 +1067,7 @@ class _OvertimeRow extends StatelessWidget {
     this.showCheckbox = false,
     this.checked = false,
     this.onChecked,
+    this.onDelete,
   });
 
   final OvertimeReviewItem item;
@@ -974,6 +1075,7 @@ class _OvertimeRow extends StatelessWidget {
   final bool showCheckbox;
   final bool checked;
   final ValueChanged<bool?>? onChecked;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -990,6 +1092,7 @@ class _OvertimeRow extends StatelessWidget {
       showCheckbox: showCheckbox,
       checked: checked,
       onChecked: onChecked,
+      onDelete: onDelete,
       semanticLabel:
           '${item.employee.fullName}, pengajuan lembur '
           '${DateFormatId.shortDate(r.date)}, ${r.durationLabel}. '
@@ -1006,6 +1109,7 @@ class _CorrectionRow extends StatelessWidget {
     this.showCheckbox = false,
     this.checked = false,
     this.onChecked,
+    this.onDelete,
   });
 
   final CorrectionReviewItem item;
@@ -1013,6 +1117,7 @@ class _CorrectionRow extends StatelessWidget {
   final bool showCheckbox;
   final bool checked;
   final ValueChanged<bool?>? onChecked;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -1028,6 +1133,7 @@ class _CorrectionRow extends StatelessWidget {
       showCheckbox: showCheckbox,
       checked: checked,
       onChecked: onChecked,
+      onDelete: onDelete,
       semanticLabel:
           '${item.employee.fullName}, koreksi absensi $date menjadi $times. '
           'Status ${c.status.label}',
