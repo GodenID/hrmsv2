@@ -6,9 +6,12 @@ import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/brand_mark.dart';
 import '../../core/widgets/page_scaffold.dart';
 import '../../core/theme/theme_colors.dart';
+import '../../data/attendance_repository.dart';
 import '../../data/auth_repository.dart';
+import '../../data/notification_repository.dart';
 import '../approvals/approvals_page.dart';
 import '../attendance/attendance_history_page.dart';
+import '../attendance/widgets/attendance_day_sheet.dart';
 import '../attendance_locations/attendance_locations_page.dart';
 import '../dashboard/dashboard_page.dart';
 import '../employees/employee_list_page.dart';
@@ -19,6 +22,7 @@ import '../reports/reports_page.dart';
 import '../warnings/warnings_page.dart';
 import '../notifications/widgets/notification_bell.dart';
 import '../profile/profile_photo.dart';
+import 'notification_link.dart';
 import 'shell_controller.dart';
 import 'shell_routes.dart';
 import 'widgets/account_menu.dart';
@@ -200,16 +204,70 @@ class _AppShellState extends State<AppShell> {
       repository: AppScope.of(context).profile,
       user: _user,
     )..load();
-    // Ketukan notifikasi saat aplikasi mati: buka menu Persetujuan.
-    PushNotifications.consumePendingTap(context);
+    // Ketukan notifikasi push (tray/banner) langsung ke detailnya. Yang
+    // terjadi saat aplikasi mati diproses setelah shell tampil.
+    PushNotifications.linkHandler = _openLink;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) PushNotifications.consumePendingTap();
+    });
   }
 
   @override
   void dispose() {
+    if (PushNotifications.linkHandler == _openLink) {
+      PushNotifications.linkHandler = null;
+    }
     _photo?.dispose();
     super.dispose();
   }
 
+  /// Pindah ke [tab] lalu buka [route] di navigator-nya. false = menu itu
+  /// tidak tersedia untuk role ini.
+  Future<bool> _pushRoute(ShellTab tab, String route, Object args) async {
+    final index = _destinations.indexWhere((d) => d.tab == tab);
+    if (index < 0) return false;
+    _openTab(tab);
+    // Tunggu menu (yang baru pertama dibuka) selesai dibangun.
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return false;
+    final navigator = _navigatorKeys[index].currentState;
+    if (navigator == null) return false;
+    navigator.pushNamed(route, arguments: args);
+    return true;
+  }
+
+  Future<bool> _showDay(AttendanceDay day) async {
+    _openTab(ShellTab.attendance);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!mounted) return false;
+    showAttendanceDaySheet(context, day);
+    return true;
+  }
+
+  /// Membuka tujuan notifikasi: detail bila ketemu; bila tidak, menu tujuan
+  /// sesuai jenis notifikasinya.
+  Future<void> _openLink(String kind, String? refType, String? refId) async {
+    final opened = await NotificationLinkResolver(
+      deps: AppScope.of(context),
+      user: _user,
+      pushRoute: _pushRoute,
+      showDay: _showDay,
+    ).open(kind: kind, refType: refType, refId: refId);
+    if (opened || !mounted) return;
+    for (final k in NotificationKind.values) {
+      if (k.name != kind) continue;
+      _openTab(switch (k.target) {
+        NotificationTarget.dashboard => ShellTab.dashboard,
+        NotificationTarget.attendance => ShellTab.attendance,
+        NotificationTarget.leave => ShellTab.leave,
+        NotificationTarget.events => ShellTab.events,
+        NotificationTarget.approvals => ShellTab.approvals,
+        NotificationTarget.employees => ShellTab.employees,
+        NotificationTarget.warnings => ShellTab.warnings,
+      });
+      return;
+    }
+  }
   void _select(int index) {
     if (index == _index) {
       // Ketuk menu yang aktif: kembali ke halaman utamanya.
@@ -373,6 +431,7 @@ class _AppShellState extends State<AppShell> {
           openTab: _openTab,
           openNotifications: () => _pushOnce(ShellRoutes.notifications),
           openProfile: () => _pushOnce(ShellRoutes.profile),
+          openLink: _openLink,
           child: PopScope(
             canPop: _index == 0 && !_nestedCanPop[0],
             onPopInvokedWithResult: _handleBack,

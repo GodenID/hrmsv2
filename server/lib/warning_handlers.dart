@@ -213,13 +213,17 @@ Router warningRouter(Db db, Config cfg) {
         await notifyTx(tx, target['username'] as String,
             kind: 'warningIssued',
             title: 'Surat peringatan SP $level',
-            body: 'Anda menerima SP $level ($vname). Buka untuk membaca dan menandatangani.');
+            body: 'Anda menerima SP $level ($vname). Buka untuk membaca dan menandatangani.',
+            refType: 'warning',
+            refId: (lm['id'] as Object).toString());
         for (final rev in await reviewersFor(
             tx, target['username'] as String, target['role'] as String)) {
           await notifyTx(tx, rev['username'] as String,
               kind: 'warningIssued',
               title: 'SP $level diterbitkan',
-              body: '${target['full_name']} menerima SP $level ($vname) dari ${actor['full_name']}.');
+              body: '${target['full_name']} menerima SP $level ($vname) dari ${actor['full_name']}.',
+              refType: 'warning',
+              refId: (lm['id'] as Object).toString());
         }
         return letterJson(lm, target['username'] as String, target['full_name'] as String);
       });
@@ -439,7 +443,9 @@ Router warningRouter(Db db, Config cfg) {
         await notifyTx(tx, m['username'] as String,
             kind: 'warningIssued',
             title: accept ? 'Sanggahan diterima, $lvl dicabut' : 'Sanggahan ditolak, $lvl tetap berlaku',
-            body: '${actor['full_name']}: "$note"');
+            body: '${actor['full_name']}: "$note"',
+            refType: 'warning',
+            refId: id);
         return letterJson(lm, m['username'] as String, (m['efn'] ?? m['username']).toString());
       });
       return json(done);

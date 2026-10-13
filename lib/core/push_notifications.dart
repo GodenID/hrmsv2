@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -5,7 +7,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import '../features/shell/shell_controller.dart';
 
 /// Kanal notifikasi sistem (Android 8+): pentingnya tinggi agar tampil
 /// di luar aplikasi seperti aplikasi lain (heads-up + suara).
@@ -27,6 +28,10 @@ abstract final class PushNotifications {
   /// Deep link tertunda dari ketukan notifikasi saat aplikasi mati.
   static Map<String, String>? _pendingTap;
 
+  /// Dipasang shell setelah login: membuka tujuan notifikasi (detail bila
+  /// ada refType/refId). Null selama belum login / shell belum tampil.
+  static Future<void> Function(String kind, String? refType, String? refId)?
+  linkHandler;
   static bool _ready = false;
 
   /// Inisialisasi Firebase + sinkron token ke server. Aman dipanggil tanpa
@@ -49,7 +54,7 @@ abstract final class PushNotifications {
           android: AndroidInitializationSettings('@mipmap/ic_launcher'),
           iOS: DarwinInitializationSettings(),
         ),
-        onDidReceiveNotificationResponse: (r) => _openApprovals(),
+        onDidReceiveNotificationResponse: (r) => _handleTap(_decode(r.payload)),
       );
       await _local
           .resolvePlatformSpecificImplementation<
@@ -98,12 +103,12 @@ abstract final class PushNotifications {
               ),
               iOS: const DarwinNotificationDetails(),
             ),
-            payload: (m.data['kind'] ?? '').toString(),
+            payload: jsonEncode(m.data),
           );
         } catch (_) {}
       });
-      // Ketuk banner/tray: buka menu Persetujuan (daftar antrean).
-      FirebaseMessaging.onMessageOpenedApp.listen(_openFromMessage);
+      // Ketuk banner/tray: buka detail pengajuan / pengumuman / SP terkait.
+      FirebaseMessaging.onMessageOpenedApp.listen((m) => _handleTap(m.data));
       FirebaseMessaging.instance.getInitialMessage().then((m) {
         if (m != null) _pendingTap = Map<String, String>.from(m.data);
       });
@@ -129,33 +134,52 @@ abstract final class PushNotifications {
     } catch (_) {}
   }
 
-  static void _openFromMessage(RemoteMessage m) {
-    // Hanya pengajuan (reviewRequested) yang punya menu tujuan pasti.
-    // Detail spesifik dibuka dari halaman Notifikasi di aplikasi.
-    if ((m.data['kind'] ?? '') != 'reviewRequested') return;
-    _openApprovals();
+  static Map<String, String> _decode(String? payload) {
+    if (payload == null || payload.isEmpty) return const {};
+    try {
+      final m = jsonDecode(payload);
+      if (m is Map) {
+        return {for (final e in m.entries) e.key.toString(): e.value.toString()};
+      }
+    } catch (_) {}
+    // Payload lama: hanya jenis notifikasi.
+    return {'kind': payload};
   }
 
-  static void _openApprovals() {
-    final context = navigatorKey.currentContext;
-    if (context == null) {
-      _pendingTap = const {'kind': 'reviewRequested'};
+  static void _handleTap(Map<String, dynamic> data) {
+    final handler = linkHandler;
+    if (handler == null) {
+      // Aplikasi baru dibuka / belum login: proses setelah shell tampil.
+      _pendingTap = {
+        for (final e in data.entries) e.key: e.value.toString(),
+      };
       return;
     }
-    ShellController.maybeOf(context)?.openTab(ShellTab.approvals);
+    _dispatch(handler, data);
   }
 
-  /// Dipanggil shell setelah login: buka Persetujuan bila ada ketukan
-  /// tertunda dari tray saat aplikasi mati.
-  static void consumePendingTap(BuildContext context) {
+  static void _dispatch(
+    Future<void> Function(String kind, String? refType, String? refId)
+    handler,
+    Map<String, dynamic> data,
+  ) {
+    final kind = (data['kind'] ?? '').toString();
+    if (kind.isEmpty) return;
+    final refType = data['refType']?.toString();
+    final refId = data['refId']?.toString();
+    unawaited(handler(kind, refType, refId));
+  }
+
+  /// Dipanggil shell setelah tampil: proses ketukan tertunda dari tray saat
+  /// aplikasi mati.
+  static void consumePendingTap() {
     final pending = _pendingTap;
-    if (pending == null) return;
+    final handler = linkHandler;
+    if (pending == null || handler == null) return;
     _pendingTap = null;
-    if ((pending['kind'] ?? '') != 'reviewRequested') return;
-    ShellController.maybeOf(context)?.openTab(ShellTab.approvals);
+    _dispatch(handler, pending);
   }
 }
-
 /// Pemicu muat-ulang lintas halaman (mis. push masuk saat aplikasi terbuka).
 /// Halaman berlangganan bus domainnya; push memicu bus yang sesuai agar
 /// semua yang tampil terganti otomatis tanpa refresh manual.

@@ -23,6 +23,7 @@ class ShellController extends InheritedWidget {
     required this.openTab,
     required this.openNotifications,
     required this.openProfile,
+    required this.openLink,
     required super.child,
   });
 
@@ -35,6 +36,11 @@ class ShellController extends InheritedWidget {
 
   /// Membuka halaman Profil di menu yang sedang aktif.
   final VoidCallback openProfile;
+
+  /// Membuka tujuan notifikasi: halaman detail bila refType/refId-nya ketemu,
+  /// selain itu menu tujuan sesuai jenisnya.
+  final Future<void> Function(String kind, String? refType, String? refId)
+  openLink;
 
   static ShellController? maybeOf(BuildContext context) =>
       context.getInheritedWidgetOfExactType<ShellController>();

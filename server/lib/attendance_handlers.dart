@@ -649,11 +649,14 @@ Router attendanceRouter(Db db, Config cfg) {
         });
         final row = ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         for (final rev in await reviewersFor(
-            tx, u['username'] as String, u['role'] as String)) {
+            tx, u['username'] as String, u['role'] as String,
+            includeSelfIfSuperadmin: true)) {
           await notifyTx(tx, rev['username'] as String,
               kind: 'reviewRequested',
               title: 'Koreksi absensi baru',
-              body: '${u['full_name']} mengajukan koreksi absensi.');
+              body: '${u['full_name']} mengajukan koreksi absensi.',
+              refType: 'correction',
+              refId: (row['id'] as Object).toString());
         }
         return row;
       });
@@ -672,8 +675,11 @@ Router attendanceRouter(Db db, Config cfg) {
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
         SELECT c.*, u.username, u.full_name, u.role AS urel
         FROM attendance_corrections c JOIN users u ON u.id=c.user_id
-        WHERE c.status<>'cancelled' AND u.username<>@me ORDER BY c.submitted_at
-      '''), parameters: {'me': actor['username']}));
+        WHERE c.status<>'cancelled' AND (u.username<>@me OR @sa::boolean) ORDER BY c.submitted_at
+      '''), parameters: {
+        'me': actor['username'],
+        'sa': actor['role'] == 'superadmin',
+      }));
       final items = <Map<String, dynamic>>[];
       for (final row in rows) {
         final m = row.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
@@ -706,7 +712,7 @@ Router attendanceRouter(Db db, Config cfg) {
         if (cur.isEmpty) throw const _Http(404, 'Koreksi tidak ditemukan.');
         final m = cur.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         if (m['status'] != 'pending') throw const _Http(400, 'Koreksi sudah diproses.');
-        if (m['username'] == actor['username']) {
+        if (m['username'] == actor['username'] && actor['role'] != 'superadmin') {
           throw const _Http(403, 'Anda tidak dapat memproses koreksi Anda sendiri.');
         }
         if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
@@ -745,7 +751,9 @@ Router attendanceRouter(Db db, Config cfg) {
             body: approve
                 ? 'Koreksi absensi disetujui oleh ${actor['full_name']}.'
                 : 'Koreksi absensi ditolak oleh ${actor['full_name']}'
-                    '${note.isEmpty ? '.' : ': "$note"'}');
+                    '${note.isEmpty ? '.' : ': "$note"'}',
+            refType: 'correction',
+            refId: id);
         return {
           'employee': {'username': m['username'], 'fullName': m['efn']},
           'correction': correctionJson(cm),
@@ -861,7 +869,8 @@ Router attendanceRouter(Db db, Config cfg) {
         });
         final row = ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         for (final rev in await reviewersFor(
-            tx, u['username'] as String, u['role'] as String)) {
+            tx, u['username'] as String, u['role'] as String,
+            includeSelfIfSuperadmin: true)) {
           await notifyTx(tx, rev['username'] as String,
               kind: 'reviewRequested',
               title: 'Pengajuan luar area baru',
@@ -1020,7 +1029,9 @@ Router attendanceRouter(Db db, Config cfg) {
             body: approve
                 ? 'Pengajuan luar area disetujui oleh ${actor['full_name']}.'
                 : 'Pengajuan luar area ditolak oleh ${actor['full_name']}'
-                    '${note.isEmpty ? '.' : ': "$note"'}');
+                    '${note.isEmpty ? '.' : ': "$note"'}',
+            refType: 'outOfArea',
+            refId: id);
         return {
           'employee': {'username': m['username'], 'fullName': m['efn']},
           'request': ooaJson(rm),

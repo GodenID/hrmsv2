@@ -67,16 +67,22 @@ Future<void> notifyTx(
 
 /// username Mikaere aktif dengan role yang bisa me-review [requesterRole],
 /// kecuali requester sendiri. Cermin MockStore.reviewersFor.
+///
+/// [includeSelfIfSuperadmin]: pengajuan Super Admin boleh diproses sendiri
+/// (lihat antrean), jadi pengaju Super Admin ikut diberi tahu agar bisa
+/// langsung membuka pengajuannya. Manager tidak pernah ikut diberi tahu
+/// untuk pengajuan Super Admin.
 Future<List<Map<String, dynamic>>> reviewersFor(
   TxSession tx,
   String requesterUsername,
-  String requesterRole,
-) async {
+  String requesterRole, {
+  bool includeSelfIfSuperadmin = false,
+}) async {
   final rs = await tx.execute(Sql.named('''
     SELECT username, full_name, role FROM users
     WHERE active AND username<>@me AND role IN ('manager','superadmin')
   '''), parameters: {'me': requesterUsername});
-  return [
+  final list = [
     for (final row in rs)
       row.toColumnMap().map((k, v) => MapEntry(k.toString(), v)),
   ].where((m) {
@@ -84,4 +90,8 @@ Future<List<Map<String, dynamic>>> reviewersFor(
     if (r == 'superadmin') return true;
     return requesterRole == 'staff'; // manager hanya atas staff
   }).toList();
+  if (includeSelfIfSuperadmin && requesterRole == 'superadmin') {
+    list.add({'username': requesterUsername, 'role': 'superadmin'});
+  }
+  return list;
 }

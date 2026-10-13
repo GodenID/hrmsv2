@@ -343,7 +343,9 @@ Router announcementRouter(Db db, Config cfg) {
             await notifyTx(tx, m['username'] as String,
                 kind: 'announcement',
                 title: 'Pengumuman baru',
-                body: (out['title'] ?? '').toString());
+                body: (out['title'] ?? '').toString(),
+                refType: 'announcement',
+                refId: (out['id'] ?? '').toString());
           }
         });
       }

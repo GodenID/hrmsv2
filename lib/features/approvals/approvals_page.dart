@@ -598,7 +598,7 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         Text(
           SessionScope.userOf(context).role == UserRole.manager
               ? 'Anda memproses pengajuan karyawan berrole Staff.'
-              : 'Anda dapat memproses pengajuan semua karyawan, kecuali '
+              : 'Anda dapat memproses pengajuan semua karyawan, termasuk '
                     'milik Anda sendiri.',
           style: textTheme.bodySmall,
         ),
