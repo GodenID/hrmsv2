@@ -634,7 +634,7 @@ Router attendanceRouter(Db db, Config cfg) {
       }
       final created = await db.pool.runTx((tx) async {
         final dup = await tx.execute(Sql.named(
-          '''SELECT 1 FROM attendance_corrections WHERE user_id=@i::uuid AND date=@d AND status='pending''',
+          '''SELECT 1 FROM attendance_corrections WHERE user_id=@i::uuid AND date=@d AND status='pending' ''',
         ), parameters: {'i': (u['id'] as Object).toString(), 'd': d.toIso8601String().substring(0, 10)});
         if (dup.isNotEmpty) throw const _Http(400, 'Sudah ada koreksi menunggu untuk tanggal ini.');
         final ins = await tx.execute(Sql.named('''
