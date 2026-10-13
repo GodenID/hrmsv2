@@ -126,7 +126,7 @@ Router eventRouter(Db db, Config cfg) {
             'fullName': row.toColumnMap()['full_name'],
             'role': row.toColumnMap()['role'],
             'note': row.toColumnMap()['note'],
-            'joinedAt': (row.toColumnMap()['joined_at'] as DateTime).toIso8601String(),
+            'joinedAt': isoUtc(row.toColumnMap()['joined_at'] as DateTime),
           }
       ],
     };

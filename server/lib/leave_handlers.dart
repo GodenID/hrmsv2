@@ -61,7 +61,7 @@ Map<String, dynamic> leaveJson(Map<String, dynamic> r) => {
       'workingDays': r['working_days'],
       'reason': r['reason'],
       'status': r['status'],
-      'submittedAt': (r['submitted_at'] as DateTime).toIso8601String(),
+      'submittedAt': isoUtc(r['submitted_at'] as DateTime),
       'attachment': r['attachment_name'] == null
           ? null
           : {
@@ -70,20 +70,20 @@ Map<String, dynamic> leaveJson(Map<String, dynamic> r) => {
               'key': r['attachment_key'],
             },
       'reviewedBy': r['reviewed_by'],
-      'reviewedAt': (r['reviewed_at'] as DateTime?)?.toIso8601String(),
+      'reviewedAt': isoUtcOpt(r['reviewed_at'] as DateTime?),
       'reviewerNote': r['reviewer_note'],
     };
 
 Map<String, dynamic> overtimeJson(Map<String, dynamic> r) => {
       'id': (r['id'] as Object).toString(),
       'date': (r['date'] as DateTime).toIso8601String().substring(0, 10),
-      'start': (r['start_time'] as DateTime).toIso8601String(),
-      'end': (r['end_time'] as DateTime).toIso8601String(),
+      'start': isoUtc(r['start_time'] as DateTime),
+      'end': isoUtc(r['end_time'] as DateTime),
       'reason': r['reason'],
       'status': r['status'],
-      'submittedAt': (r['submitted_at'] as DateTime).toIso8601String(),
+      'submittedAt': isoUtc(r['submitted_at'] as DateTime),
       'reviewedBy': r['reviewed_by'],
-      'reviewedAt': (r['reviewed_at'] as DateTime?)?.toIso8601String(),
+      'reviewedAt': isoUtcOpt(r['reviewed_at'] as DateTime?),
       'reviewerNote': r['reviewer_note'],
     };
 
@@ -740,7 +740,7 @@ Router notificationRouter(Db db, Config cfg) {
         'kind': m['kind'],
         'title': m['title'],
         'body': m['body'],
-        'createdAt': (m['created_at'] as DateTime).toIso8601String(),
+        'createdAt': isoUtc(m['created_at'] as DateTime),
         'read': m['read'],
       };
 

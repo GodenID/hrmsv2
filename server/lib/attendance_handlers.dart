@@ -57,8 +57,8 @@ Map<String, dynamic> locJson(Map<String, dynamic> r) => {
 
 Map<String, dynamic> recordJson(Map<String, dynamic>? r, DateTime date) => {
       'date': date.toIso8601String().substring(0, 10),
-      'clockIn': (r?['clock_in'] as DateTime?)?.toIso8601String(),
-      'clockOut': (r?['clock_out'] as DateTime?)?.toIso8601String(),
+      'clockIn': isoUtcOpt(r?['clock_in'] as DateTime?),
+      'clockOut': isoUtcOpt(r?['clock_out'] as DateTime?),
       'clockInLocation': r?['clock_in_location'],
       'clockOutLocation': r?['clock_out_location'],
     };
@@ -66,13 +66,13 @@ Map<String, dynamic> recordJson(Map<String, dynamic>? r, DateTime date) => {
 Map<String, dynamic> correctionJson(Map<String, dynamic> r) => {
       'id': (r['id'] as Object).toString(),
       'date': (r['date'] as DateTime).toIso8601String().substring(0, 10),
-      'clockIn': (r['clock_in'] as DateTime).toIso8601String(),
-      'clockOut': (r['clock_out'] as DateTime).toIso8601String(),
+      'clockIn': isoUtc(r['clock_in'] as DateTime),
+      'clockOut': isoUtc(r['clock_out'] as DateTime),
       'reason': r['reason'],
       'status': r['status'],
-      'submittedAt': (r['submitted_at'] as DateTime).toIso8601String(),
+      'submittedAt': isoUtc(r['submitted_at'] as DateTime),
       'reviewedBy': r['reviewed_by'],
-      'reviewedAt': (r['reviewed_at'] as DateTime?)?.toIso8601String(),
+      'reviewedAt': isoUtcOpt(r['reviewed_at'] as DateTime?),
       'reviewerNote': r['reviewer_note'],
     };
 
@@ -80,7 +80,7 @@ Map<String, dynamic> ooaJson(Map<String, dynamic> r) => {
       'id': (r['id'] as Object).toString(),
       'date': (r['date'] as DateTime).toIso8601String().substring(0, 10),
       'kind': r['kind'],
-      'requestedAt': (r['requested_at'] as DateTime).toIso8601String(),
+      'requestedAt': isoUtc(r['requested_at'] as DateTime),
       'latitude': r['latitude'],
       'longitude': r['longitude'],
       'accuracyMeters': r['accuracy_meters'],
@@ -88,22 +88,22 @@ Map<String, dynamic> ooaJson(Map<String, dynamic> r) => {
       'distanceMeters': r['distance_meters'],
       'reason': r['reason'],
       'status': r['status'],
-      'submittedAt': (r['submitted_at'] as DateTime).toIso8601String(),
+      'submittedAt': isoUtc(r['submitted_at'] as DateTime),
       'reviewedBy': r['reviewed_by'],
-      'reviewedAt': (r['reviewed_at'] as DateTime?)?.toIso8601String(),
+      'reviewedAt': isoUtcOpt(r['reviewed_at'] as DateTime?),
       'reviewerNote': r['reviewer_note'],
     };
 
 Map<String, dynamic> overtimeOut(Map<String, dynamic> r) => {
       'id': (r['id'] as Object).toString(),
       'date': (r['date'] as DateTime).toIso8601String().substring(0, 10),
-      'start': (r['start_time'] as DateTime).toIso8601String(),
-      'end': (r['end_time'] as DateTime).toIso8601String(),
+      'start': isoUtc(r['start_time'] as DateTime),
+      'end': isoUtc(r['end_time'] as DateTime),
       'reason': r['reason'],
       'status': r['status'],
-      'submittedAt': (r['submitted_at'] as DateTime).toIso8601String(),
+      'submittedAt': isoUtc(r['submitted_at'] as DateTime),
       'reviewedBy': r['reviewed_by'],
-      'reviewedAt': (r['reviewed_at'] as DateTime?)?.toIso8601String(),
+      'reviewedAt': isoUtcOpt(r['reviewed_at'] as DateTime?),
       'reviewerNote': r['reviewer_note'],
     };
 
@@ -275,8 +275,8 @@ Router attendanceRouter(Db db, Config cfg) {
       });
       return json({
         'date': day,
-        'clockIn': (rec['ci'] as DateTime?)?.toIso8601String(),
-        'clockOut': (rec['co'] as DateTime?)?.toIso8601String(),
+        'clockIn': isoUtcOpt(rec['ci'] as DateTime?),
+        'clockOut': isoUtcOpt(rec['co'] as DateTime?),
         'clockInLocation': rec['cil'],
         'clockOutLocation': rec['col'],
       });
@@ -417,12 +417,12 @@ Router attendanceRouter(Db db, Config cfg) {
             'workingDays': m['working_days'],
             'reason': m['reason'],
             'status': m['status'],
-            'submittedAt': (m['submitted_at'] as DateTime).toIso8601String(),
+            'submittedAt': isoUtc(m['submitted_at'] as DateTime),
             'attachment': m['attachment_name'] == null
                 ? null
                 : {'name': m['attachment_name'], 'sizeBytes': m['attachment_size']},
             'reviewedBy': m['reviewed_by'],
-            'reviewedAt': (m['reviewed_at'] as DateTime?)?.toIso8601String(),
+            'reviewedAt': isoUtcOpt(m['reviewed_at'] as DateTime?),
             'reviewerNote': m['reviewer_note'],
           };
 
@@ -553,8 +553,8 @@ Router attendanceRouter(Db db, Config cfg) {
         out.add({
           'date': date.toIso8601String().substring(0, 10),
           'status': status,
-          'clockIn': ci?.toIso8601String(),
-          'clockOut': co?.toIso8601String(),
+          'clockIn': ci == null ? null : isoUtc(ci),
+          'clockOut': co == null ? null : isoUtc(co),
           'clockInLocation': cil,
           'clockOutLocation': col,
           'leave': lv == null ? null : leaveOut(lv),

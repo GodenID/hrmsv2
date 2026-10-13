@@ -25,6 +25,13 @@ DateTime addMonths(DateTime date, int months) {
 /// Jam server dipakai sebagai WIB.
 DateTime nowWib() => DateTime.now().toUtc().add(const Duration(hours: 7));
 
+/// Emit waktu ke JSON: SELALU bertanda UTC. Driver Postgres mengembalikan
+/// waktu lokal-naif (jam UTC tanpa 'Z'); tanpa toUtc(), Flutter membaca
+/// jam UTC sebagai jam lokal (WIB) sehingga semua tampil 7 jam lebih awal.
+String isoUtc(DateTime d) => d.toUtc().toIso8601String();
+
+String? isoUtcOpt(DateTime? d) => d?.toUtc().toIso8601String();
+
 /// Terlambat = clock in lewat 09.00 WIB. Selalu konversi ke WIB dulu:
 /// container server berjalan di UTC sehingga .hour langsung / .toLocal()
 /// SALAH (tidak ada yang pernah terlambat).

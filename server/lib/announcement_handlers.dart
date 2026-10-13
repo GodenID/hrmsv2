@@ -40,9 +40,9 @@ Map<String, dynamic> annJson(
       'title': a['title'],
       'body': a['body'],
       'authorName': a['author_name'],
-      'publishedAt': (a['published_at'] as DateTime).toIso8601String(),
-      'updatedAt': (a['updated_at'] as DateTime?)?.toIso8601String(),
-      'expiresAt': (a['expires_at'] as DateTime?)?.toIso8601String(),
+      'publishedAt': isoUtc(a['published_at'] as DateTime),
+      'updatedAt': isoUtcOpt(a['updated_at'] as DateTime?),
+      'expiresAt': isoUtcOpt(a['expires_at'] as DateTime?),
       'pinned': a['pinned'],
       'targetDivisions': ((a['target_divisions'] ?? '') as String)
           .split(',')
@@ -204,7 +204,7 @@ Router announcementRouter(Db db, Config cfg) {
             'fullName': m['full_name'] ?? m['username'],
             'photoUrl': photoUrl(m['photo_key'] as String?),
           },
-          'viewedAt': (m['viewed_at'] as DateTime).toIso8601String(),
+          'viewedAt': isoUtc(m['viewed_at'] as DateTime),
         });
       }
       final rest = await db.pool.runTx((tx) => tx.execute(

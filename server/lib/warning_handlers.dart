@@ -50,19 +50,19 @@ Map<String, dynamic> letterJson(
         'articleRef': l['article_ref'],
         'issuedBy': l['issued_by'],
         'issuedByName': l['issued_by_name'],
-        'issuedAt': (l['issued_at'] as DateTime).toIso8601String(),
-        'expiresAt': (l['expires_at'] as DateTime).toIso8601String(),
-        'acknowledgedAt': (l['acknowledged_at'] as DateTime?)?.toIso8601String(),
+        'issuedAt': isoUtc(l['issued_at'] as DateTime),
+        'expiresAt': isoUtc(l['expires_at'] as DateTime),
+        'acknowledgedAt': isoUtcOpt(l['acknowledged_at'] as DateTime?),
         'acknowledgedBy': l['acknowledged_by'],
         'refused': l['refused'] == true,
         'witness1': l['witness1'],
         'witness2': l['witness2'],
         'appeal': l['appeal'],
-        'appealAt': (l['appeal_at'] as DateTime?)?.toIso8601String(),
+        'appealAt': isoUtcOpt(l['appeal_at'] as DateTime?),
         'appealAccepted': l['appeal_accepted'],
         'appealResponseNote': l['appeal_response_note'],
         'appealRespondedAt':
-            (l['appeal_responded_at'] as DateTime?)?.toIso8601String(),
+            isoUtcOpt(l['appeal_responded_at'] as DateTime?),
       },
     };
 
@@ -129,7 +129,8 @@ Router warningRouter(Db db, Config cfg) {
         return json({'message': 'Karyawan tidak ditemukan atau nonaktif.'}, status: 404);
       }
       final uid = (target.first.toColumnMap()['id'] as Object).toString();
-      final active = await db.pool.runTx((tx) => activeFor(tx, uid, nowWib()));
+      final active =
+          await db.pool.runTx((tx) => activeFor(tx, uid, DateTime.now().toUtc()));
       if (active.any((l) => (l['level'] as int) >= 3)) {
         return json({'suggestedLevel': 3, 'activeCount': active.length, 'phkEligible': true});
       }
@@ -188,7 +189,8 @@ Router warningRouter(Db db, Config cfg) {
             (actor['username'] as String).toLowerCase()) {
           throw const _Http(403, 'Anda tidak dapat menerbitkan SP untuk diri sendiri.');
         }
-        final issuedAt = nowWib();
+        final issuedAt = DateTime.now().toUtc();
+        final expDate = addMonths(dateOnly(nowWib()), validityMonths);
         final ins = await tx.execute(Sql.named('''
           INSERT INTO warnings(employee_user_id, violation_name, severity, level,
             incident_date, description, article_ref, issued_by, issued_by_name,
@@ -204,8 +206,8 @@ Router warningRouter(Db db, Config cfg) {
           'a': article,
           'ib': actor['username'],
           'ibn': actor['full_name'],
-          'ia': issuedAt.toUtc().toIso8601String(),
-          'ea': addMonths(issuedAt, validityMonths).toUtc().toIso8601String(),
+          'ia': issuedAt.toIso8601String(),
+          'ea': DateTime.utc(expDate.year, expDate.month, expDate.day).toIso8601String(),
         });
         final lm = ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         await notifyTx(tx, target['username'] as String,
@@ -269,7 +271,7 @@ Router warningRouter(Db db, Config cfg) {
       }
       // pengingat H-30 untuk superadmin
       if (actor['role'] == 'superadmin') {
-        final now = nowWib();
+        final now = DateTime.now().toUtc();
         await db.pool.runTx((tx) async {
           final rs = await tx.execute(Sql.named('''
             SELECT w.*, u.username, u.full_name AS efn FROM warnings w
