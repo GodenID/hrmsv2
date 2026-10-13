@@ -745,6 +745,8 @@ Router attendanceRouter(Db db, Config cfg) {
             'co': (cm['clock_out'] as DateTime).toUtc().toIso8601String(),
           });
         }
+        await markReviewHandled(tx, 'correction', id);
+        if (m['username'] != actor['username']) {
         await notifyTx(tx, m['username'] as String,
             kind: approve ? 'correctionApproved' : 'correctionRejected',
             title: approve ? 'Koreksi absensi disetujui' : 'Koreksi absensi ditolak',
@@ -754,6 +756,7 @@ Router attendanceRouter(Db db, Config cfg) {
                     '${note.isEmpty ? '.' : ': "$note"'}',
             refType: 'correction',
             refId: id);
+        }
         return {
           'employee': {'username': m['username'], 'fullName': m['efn']},
           'correction': correctionJson(cm),
@@ -1023,6 +1026,8 @@ Router attendanceRouter(Db db, Config cfg) {
           'i': id,
         });
         final rm = upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        await markReviewHandled(tx, 'outOfArea', id);
+        if (m['username'] != actor['username']) {
         await notifyTx(tx, m['username'] as String,
             kind: approve ? 'outOfAreaApproved' : 'outOfAreaRejected',
             title: approve ? 'Pengajuan luar area disetujui' : 'Pengajuan luar area ditolak',
@@ -1032,6 +1037,7 @@ Router attendanceRouter(Db db, Config cfg) {
                     '${note.isEmpty ? '.' : ': "$note"'}',
             refType: 'outOfArea',
             refId: id);
+        }
         return {
           'employee': {'username': m['username'], 'fullName': m['efn']},
           'request': ooaJson(rm),

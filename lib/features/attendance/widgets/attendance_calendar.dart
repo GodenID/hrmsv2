@@ -6,14 +6,13 @@ import '../../../core/utils/work_calendar.dart';
 import '../../../data/attendance_repository.dart';
 import '../attendance_presentation.dart';
 
-/// Kalender absensi per rentang tanggal (Senin–Minggu), mengikuti periode
-/// buku 26–25. Warna tiap tanggal:
-/// hijau = hadir, biru = cuti, ungu = izin, merah muda = sakit,
-/// abu-abu = belum absen / tidak hadir. Pengajuan yang masih menunggu
-/// digambar berarsir.
+/// Kalender absensi per rentang tanggal (Senin-Minggu), mengikuti periode
+/// buku 26-25. Hanya empat warna:
+/// hijau = hadir, biru = cuti / izin, merah = sakit, abu-abu = belum absen.
+/// Pengajuan yang masih menunggu digambar berarsir dengan garis tepi.
 ///
-/// Lebar sel >= 92: tampil jam clock in–out / jenis cuti di dalam sel.
-/// Lebih sempit (HP): hanya angka tanggal + penanda.
+/// Lebar sel >= 92: tampil jam clock in-out / jenis cuti di dalam sel.
+/// Lebih sempit (HP): angka tanggal saja.
 class AttendanceCalendar extends StatelessWidget {
   const AttendanceCalendar({
     super.key,
@@ -24,7 +23,7 @@ class AttendanceCalendar extends StatelessWidget {
     required this.onTapDay,
   });
 
-  /// Batas rentang (inklusif), mis. 26 Sep – 25 Okt.
+  /// Batas rentang (inklusif), mis. 26 Sep - 25 Okt.
   final DateTime start;
   final DateTime end;
   final DateTime today;
@@ -35,7 +34,7 @@ class AttendanceCalendar extends StatelessWidget {
   final ValueChanged<AttendanceDay> onTapDay;
 
   static const _weekdays = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-  static const double _gap = 4;
+  static const double _gap = 6;
 
   @override
   Widget build(BuildContext context) {
@@ -53,21 +52,22 @@ class AttendanceCalendar extends StatelessWidget {
       builder: (context, constraints) {
         final cellWidth = (constraints.maxWidth - _gap * 6) / 7;
         final detailed = cellWidth >= 92;
-        final cellHeight = detailed ? 78.0 : 48.0;
+        final cellHeight = detailed ? 80.0 : 46.0;
 
         final rows = <Widget>[];
-        for (var start = 0; start < cellCount; start += 7) {
+        for (var rowStart = 0; rowStart < cellCount; rowStart += 7) {
           rows.add(
             Padding(
-              padding: EdgeInsets.only(top: start == 0 ? 0 : _gap),
+              padding: EdgeInsets.only(top: rowStart == 0 ? 0 : _gap),
               child: Row(
                 children: [
-                  for (var i = start; i < start + 7; i++) ...[
-                    if (i > start) const SizedBox(width: _gap),
+                  for (var i = rowStart; i < rowStart + 7; i++) ...[
+                    if (i > rowStart) const SizedBox(width: _gap),
                     Expanded(
                       child: SizedBox(
                         height: cellHeight,
                         child: _cellAt(
+                          context,
                           i - leading,
                           totalDays,
                           byDate,
@@ -93,13 +93,16 @@ class AttendanceCalendar extends StatelessWidget {
                     if (i > 0) const SizedBox(width: _gap),
                     Expanded(
                       child: Padding(
-                        padding: EdgeInsets.only(left: detailed ? 8 : 0),
+                        padding: EdgeInsets.only(left: detailed ? 10 : 0),
                         child: Text(
-                          _weekdays[i],
+                          _weekdays[i].toUpperCase(),
                           textAlign: detailed
                               ? TextAlign.left
                               : TextAlign.center,
                           style: textTheme.labelSmall?.copyWith(
+                            fontSize: 10.5,
+                            letterSpacing: 0.6,
+                            fontWeight: FontWeight.w600,
                             color: i >= 5
                                 ? context.inkTertiary
                                 : context.inkSecondary,
@@ -120,6 +123,7 @@ class AttendanceCalendar extends StatelessWidget {
   }
 
   Widget _cellAt(
+    BuildContext context,
     int offset,
     int totalDays,
     Map<DateTime, AttendanceDay> byDate,
@@ -134,12 +138,13 @@ class AttendanceCalendar extends StatelessWidget {
     final look = loading
         ? const CalendarLook(tone: CalendarTone.upcoming)
         : calendarLookFor(day, date: date, today: today);
-    // Semua tanggal sampai hari ini bisa diketuk — termasuk akhir pekan/libur
+    // Semua tanggal sampai hari ini bisa diketuk - termasuk akhir pekan/libur
     // dan tanggal yang tidak ada datanya dari server (mis. sebelum akun
-    // dibuat) — untuk melihat catatan atau mengajukan absensi bila lupa.
+    // dibuat) - untuk melihat catatan atau mengajukan absensi bila lupa.
     // Tanggal mendatang tidak bisa diketuk.
     final tappable =
-        !loading && !WorkCalendar.dateOnly(date).isAfter(WorkCalendar.dateOnly(today));
+        !loading &&
+        !WorkCalendar.dateOnly(date).isAfter(WorkCalendar.dateOnly(today));
     final target =
         day ??
         AttendanceDay(
@@ -173,52 +178,41 @@ class _DayCell extends StatelessWidget {
   final bool detailed;
   final VoidCallback? onTap;
 
+  static const double _radius = 14;
+
   @override
   Widget build(BuildContext context) {
     final tone = look.tone;
-    final radius = BorderRadius.circular(AppRadius.control);
+    final radius = BorderRadius.circular(_radius);
     final pending = look.pending;
+    final ink = tone.inkOf(context);
+    final colored =
+        tone != CalendarTone.upcoming && tone != CalendarTone.off;
 
     final number = Text(
       '${date.day}',
       style: TextStyle(
-        fontSize: detailed ? 14 : 13.5,
+        fontSize: detailed ? 15 : 14,
         height: 1.1,
-        fontWeight: isToday || tone != CalendarTone.upcoming
-            ? FontWeight.w700
-            : FontWeight.w500,
-        color: tone.inkOf(context),
+        fontWeight: colored || isToday ? FontWeight.w700 : FontWeight.w500,
+        color: ink,
         fontFeatures: const [FontFeature.tabularFigures()],
       ),
     );
 
-    final flags = look.flags.isEmpty
-        ? null
-        : Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              for (final f in look.flags)
-                Container(
-                  width: 6,
-                  height: 6,
-                  margin: const EdgeInsets.only(left: 3),
-                  decoration: BoxDecoration(
-                    color: f.colorOf(context),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: context.surface, width: 0.8),
-                  ),
-                ),
-            ],
-          );
+    // Penanda "perlu koreksi": ikon kecil seinduk warna tanggalnya.
+    final marker = look.flags.contains(CalendarFlag.needsCorrection)
+        ? Icon(Icons.error_outline, size: detailed ? 14 : 11, color: ink)
+        : null;
 
     final Widget content;
     if (detailed) {
       content = Padding(
-        padding: const EdgeInsets.fromLTRB(8, 7, 7, 6),
+        padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(children: [number, const Spacer(), ?flags]),
+            Row(children: [number, const Spacer(), ?marker]),
             const Spacer(),
             if (look.caption != null)
               Text(
@@ -229,7 +223,7 @@ class _DayCell extends StatelessWidget {
                   fontSize: 11.5,
                   height: 1.25,
                   fontWeight: FontWeight.w600,
-                  color: tone.inkOf(context),
+                  color: ink,
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
@@ -240,7 +234,7 @@ class _DayCell extends StatelessWidget {
       content = Stack(
         children: [
           Center(child: number),
-          if (flags != null) Positioned(top: 4, right: 3, child: flags),
+          if (marker != null) Positioned(top: 4, right: 4, child: marker),
         ],
       );
     }
@@ -259,22 +253,21 @@ class _DayCell extends StatelessWidget {
               )
             : null,
         child: Material(
-          color: pending ? context.surface : tone.fillOf(context),
+          color: pending ? Colors.transparent : tone.fillOf(context),
           clipBehavior: Clip.antiAlias,
           shape: RoundedRectangleBorder(
             borderRadius: radius,
-            side: BorderSide(
-              color: pending
-                  ? tone.inkOf(context).withValues(alpha: 0.55)
-                  : tone.borderOf(context),
-              width: pending ? 1.4 : 1,
-            ),
+            side: pending
+                ? BorderSide(color: tone.accentOf(context), width: 1.5)
+                : BorderSide.none,
           ),
           child: InkWell(
             onTap: onTap,
             child: pending
                 ? CustomPaint(
-                    painter: HatchPainter(tone.fillOf(context)),
+                    painter: HatchPainter(
+                      tone.accentOf(context).withValues(alpha: 0.16),
+                    ),
                     child: content,
                   )
                 : content,
@@ -316,67 +309,65 @@ class AttendanceCalendarLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final style = Theme.of(context).textTheme.bodySmall
-        ?.copyWith(fontSize: 12.5);
+    final style = Theme.of(context).textTheme.bodySmall?.copyWith(
+      fontSize: 12.5,
+    );
 
     Widget item(Widget swatch, String label) => Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         swatch,
-        const SizedBox(width: 6),
+        const SizedBox(width: 7),
         Text(label, style: style),
       ],
     );
 
-    Widget box(CalendarTone tone, {bool pending = false}) => Container(
-      width: 14,
-      height: 14,
+    Widget box(CalendarTone tone) => Container(
+      width: 16,
+      height: 16,
       decoration: BoxDecoration(
-        color: pending ? context.surface : tone.fillOf(context),
-        borderRadius: BorderRadius.circular(3),
-        border: Border.all(
-          color: pending
-              ? tone.inkOf(context).withValues(alpha: 0.55)
-              : tone.borderOf(context),
-        ),
+        color: tone.fillOf(context),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(color: tone.accentOf(context), width: 1.2),
       ),
-      clipBehavior: Clip.antiAlias,
-      child: pending
-          ? CustomPaint(painter: HatchPainter(tone.fillOf(context)))
-          : null,
     );
 
-    Widget dot(Color color) => Container(
-      width: 8,
-      height: 8,
-      margin: const EdgeInsets.all(3),
-      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-    );
+    final pendingTone = CalendarTone.annualLeave;
 
     return Wrap(
       spacing: AppSpacing.lg,
       runSpacing: AppSpacing.sm,
       children: [
-        for (final tone in [
-          CalendarTone.present,
-          CalendarTone.annualLeave,
-          CalendarTone.permission,
-          CalendarTone.sick,
-          CalendarTone.missing,
-        ])
-          item(box(tone), tone.label),
-        item(
-          box(CalendarTone.annualLeave, pending: true),
-          'Menunggu persetujuan',
-        ),
-        for (final f in CalendarFlag.values)
-          item(dot(f.colorOf(context)), f.label),
+        item(box(CalendarTone.present), 'Hadir'),
+        item(box(CalendarTone.annualLeave), 'Cuti / izin'),
+        item(box(CalendarTone.sick), 'Sakit'),
+        item(box(CalendarTone.missing), 'Belum absen'),
         item(
           Container(
-            width: 14,
-            height: 14,
+            width: 16,
+            height: 16,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(3),
+              borderRadius: BorderRadius.circular(5),
+              border: Border.all(
+                color: pendingTone.accentOf(context),
+                width: 1.5,
+              ),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: CustomPaint(
+              painter: HatchPainter(
+                pendingTone.accentOf(context).withValues(alpha: 0.2),
+              ),
+            ),
+          ),
+          'Menunggu persetujuan',
+        ),
+        item(
+          Container(
+            width: 16,
+            height: 16,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(5),
               border: Border.all(color: context.ink, width: 2),
             ),
           ),

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/theme/app_colors.dart';
 import '../../core/theme/theme_colors.dart';
 import '../../core/utils/date_format_id.dart';
 import '../../core/widgets/panel.dart';
@@ -66,6 +65,29 @@ ChipTone requestTone(RequestStatus status) => switch (status) {
 // Kalender
 // -----------------------------------------------------------------------------
 
+/// Palet kalender absensi (sengaja terpisah dari palet aplikasi: hanya
+/// empat warna status).
+abstract final class _CalendarPalette {
+  static const Color green = Color(0xFF22C55E);
+  static const Color greenFill = Color(0xFFD9F5E3);
+  static const Color greenInk = Color(0xFF14632F);
+  static const Color greenInkDark = Color(0xFF86EFAC);
+
+  static const Color blue = Color(0xFF3B82F6);
+  static const Color blueFill = Color(0xFFDCE9FE);
+  static const Color blueInk = Color(0xFF1E429F);
+  static const Color blueInkDark = Color(0xFF93C5FD);
+
+  static const Color red = Color(0xFFEF4444);
+  static const Color redFill = Color(0xFFFDE0E0);
+  static const Color redInk = Color(0xFF9B1C1C);
+  static const Color redInkDark = Color(0xFFFCA5A5);
+
+  static const Color grey = Color(0xFF94A3B8);
+  static const Color greyFill = Color(0xFFE8ECF1);
+  static const Color greyInk = Color(0xFF475569);
+  static const Color greyInkDark = Color(0xFFCBD5E1);
+}
 /// Kategori warna satu tanggal di kalender absensi.
 enum CalendarTone {
   present('Hadir'),
@@ -80,73 +102,46 @@ enum CalendarTone {
 
   final String label;
 
+  /// Warna dasar (aksen) tiap kategori. Kalender hanya memakai empat warna:
+  /// hijau = hadir, biru = cuti / izin, merah = sakit, abu-abu = belum absen.
+  Color accentOf(BuildContext context) => switch (this) {
+    present => _CalendarPalette.green,
+    annualLeave || permission => _CalendarPalette.blue,
+    sick => _CalendarPalette.red,
+    missing => _CalendarPalette.grey,
+    upcoming || off => context.borderStrong,
+  };
+
   Color fillOf(BuildContext context) {
-    if (!context.isDark) {
-      return switch (this) {
-        present => AppColors.presentFill,
-        annualLeave => AppColors.annualLeaveFill,
-        permission => AppColors.permissionFill,
-        sick => AppColors.sickFill,
-        missing => AppColors.missingFill,
-        upcoming || off => Colors.white,
-      };
-    }
+    final dark = context.isDark;
     return switch (this) {
-      present => context.presentFill,
-      annualLeave => context.leaveFill,
-      permission => context.permitFill,
-      sick => context.sickFill,
-      missing => context.missingFill,
-      upcoming || off => context.surface,
+      present => dark ? _CalendarPalette.green.withValues(alpha: 0.24) : _CalendarPalette.greenFill,
+      annualLeave ||
+      permission => dark ? _CalendarPalette.blue.withValues(alpha: 0.26) : _CalendarPalette.blueFill,
+      sick => dark ? _CalendarPalette.red.withValues(alpha: 0.26) : _CalendarPalette.redFill,
+      missing => dark ? _CalendarPalette.grey.withValues(alpha: 0.22) : _CalendarPalette.greyFill,
+      upcoming || off => Colors.transparent,
     };
   }
 
-  Color borderOf(BuildContext context) {
-    if (!context.isDark) {
-      return switch (this) {
-        present => AppColors.presentBorder,
-        annualLeave => AppColors.annualLeaveBorder,
-        permission => AppColors.permissionBorder,
-        sick => AppColors.sickBorder,
-        missing => AppColors.missingBorder,
-        upcoming => AppColors.border,
-        off => Colors.transparent,
-      };
-    }
-    return switch (this) {
-      present => context.success.withValues(alpha: 0.55),
-      annualLeave => context.accentText.withValues(alpha: 0.55),
-      permission => context.accentText.withValues(alpha: 0.55),
-      sick => context.danger.withValues(alpha: 0.45),
-      missing => context.borderStrong,
-      upcoming => context.border,
-      off => Colors.transparent,
-    };
-  }
+  /// Garis tepi hanya dipakai untuk pengajuan yang masih menunggu.
+  Color borderOf(BuildContext context) => switch (this) {
+    upcoming || off => Colors.transparent,
+    _ => accentOf(context).withValues(alpha: 0.35),
+  };
 
   Color inkOf(BuildContext context) {
-    if (!context.isDark) {
-      return switch (this) {
-        present => AppColors.presentInk,
-        annualLeave => AppColors.annualLeaveInk,
-        permission => AppColors.permissionInk,
-        sick => AppColors.sickInk,
-        missing => AppColors.inkSecondary,
-        upcoming => AppColors.ink,
-        off => AppColors.inkTertiary,
-      };
-    }
+    final dark = context.isDark;
     return switch (this) {
-      present => context.success,
-      annualLeave => context.accentText,
-      permission => context.accentText,
-      sick => context.danger,
-      missing => context.inkSecondary,
+      present => dark ? _CalendarPalette.greenInkDark : _CalendarPalette.greenInk,
+      annualLeave ||
+      permission => dark ? _CalendarPalette.blueInkDark : _CalendarPalette.blueInk,
+      sick => dark ? _CalendarPalette.redInkDark : _CalendarPalette.redInk,
+      missing => dark ? _CalendarPalette.greyInkDark : _CalendarPalette.greyInk,
       upcoming => context.ink,
       off => context.inkTertiary,
     };
   }
-
   static CalendarTone forLeave(LeaveType type) => switch (type) {
     LeaveType.annual || LeaveType.maternity => annualLeave,
     LeaveType.permission => permission,
@@ -154,7 +149,8 @@ enum CalendarTone {
   };
 }
 
-/// Penanda kecil di sudut tanggal.
+/// Penanda kecil di sudut tanggal. Tidak punya warna sendiri: memakai warna
+/// kategori tanggalnya.
 enum CalendarFlag {
   late('Terlambat'),
   overtime('Lembur'),
@@ -163,14 +159,7 @@ enum CalendarFlag {
   const CalendarFlag(this.label);
 
   final String label;
-
-  Color colorOf(BuildContext context) => switch (this) {
-    CalendarFlag.late => AppColors.warningIndicator,
-    CalendarFlag.overtime => context.overtimeTint,
-    CalendarFlag.needsCorrection => context.danger,
-  };
 }
-
 /// Cara satu tanggal digambar di kalender.
 class CalendarLook {
   const CalendarLook({
@@ -206,11 +195,8 @@ CalendarLook calendarLookFor(
     );
   }
 
-  final flags = [
-    if (day.status == AttendanceDayStatus.late) CalendarFlag.late,
-    if (day.overtime != null) CalendarFlag.overtime,
-    if (day.needsAttention) CalendarFlag.needsCorrection,
-  ];
+  // Hanya satu penanda (tanpa warna tambahan): hari tanpa catatan lengkap.
+  final flags = [if (day.needsAttention) CalendarFlag.needsCorrection];
 
   final leave = day.leave;
   if (leave != null) {
@@ -245,7 +231,7 @@ CalendarLook calendarLookFor(
     ),
     _ => CalendarLook(
       tone: CalendarTone.missing,
-      caption: 'Tidak hadir',
+      caption: 'Belum absen',
       flags: flags,
     ),
   };

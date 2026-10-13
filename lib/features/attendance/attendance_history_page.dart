@@ -562,7 +562,7 @@ class _AttentionNote extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              'Ada $count hari tanpa catatan lengkap (titik merah di '
+              'Ada $count hari tanpa catatan lengkap (ikon tanda seru di '
               'kalender). Ketuk tanggalnya lalu ajukan absensi agar durasi '
               'kerja Anda dihitung dengan benar.',
               style: Theme.of(context).textTheme.bodyMedium

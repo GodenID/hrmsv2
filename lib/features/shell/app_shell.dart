@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
@@ -232,7 +234,17 @@ class _AppShellState extends State<AppShell> {
     if (!mounted) return false;
     final navigator = _navigatorKeys[index].currentState;
     if (navigator == null) return false;
-    navigator.pushNamed(route, arguments: args);
+    // Setelah halaman detail/review ditutup (mungkin ada keputusan atau
+    // pembatalan), segarkan semua tampilan terkait agar daftar Persetujuan,
+    // Pengajuan, kalender Absensi, dan notifikasi tetap sejalan.
+    unawaited(
+      navigator.pushNamed<Object?>(route, arguments: args).then((_) {
+        AppRefresh.pingAttendance();
+        AppRefresh.pingLeave();
+        AppRefresh.pingOvertime();
+        AppRefresh.pingNotifications();
+      }),
+    );
     return true;
   }
 

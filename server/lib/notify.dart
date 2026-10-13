@@ -95,3 +95,19 @@ Future<List<Map<String, dynamic>>> reviewersFor(
   }
   return list;
 }
+
+/// Pengajuan sudah diproses: notifikasi "pengajuan baru" miliknya (untuk
+/// semua pemroses) otomatis dianggap sudah dibaca agar daftar notifikasi
+/// sejalan dengan halaman Persetujuan.
+Future<void> markReviewHandled(
+  TxSession tx,
+  String refType,
+  String refId,
+) async {
+  await tx.execute(
+    Sql.named(
+      "UPDATE notifications SET read=TRUE WHERE kind='reviewRequested' AND ref_type=@t AND ref_id=@i",
+    ),
+    parameters: {'t': refType, 'i': refId},
+  );
+}

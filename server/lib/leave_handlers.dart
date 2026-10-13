@@ -388,6 +388,8 @@ Router leaveRouter(Db db, Config cfg) {
           'i': id,
         });
         final rm = upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        await markReviewHandled(tx, 'leave', id);
+        if (m['username'] != actor['username']) {
         await notifyTx(tx, m['username'] as String,
             kind: approve ? 'leaveApproved' : 'leaveRejected',
             title: approve ? 'Cuti disetujui' : 'Cuti ditolak',
@@ -397,6 +399,7 @@ Router leaveRouter(Db db, Config cfg) {
                     '${note.isEmpty ? '.' : ': "$note"'}',
             refType: 'leave',
             refId: id);
+        }
         final use = await annualUsage(tx, (m['user_id'] as Object).toString());
         return {
           'employee': {'username': m['username'], 'fullName': m['efn']},
@@ -720,6 +723,8 @@ Router overtimeRouter(Db db, Config cfg) {
           'i': id,
         });
         final rm = upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        await markReviewHandled(tx, 'overtime', id);
+        if (m['username'] != actor['username']) {
         await notifyTx(tx, m['username'] as String,
             kind: approve ? 'overtimeApproved' : 'overtimeRejected',
             title: approve ? 'Pengajuan lembur disetujui' : 'Pengajuan lembur ditolak',
@@ -728,6 +733,7 @@ Router overtimeRouter(Db db, Config cfg) {
                 : 'Lembur ditolak oleh ${actor['full_name']}${note.isEmpty ? '.' : ': "$note"'}',
             refType: 'overtime',
             refId: id);
+        }
         return {
           'employee': {'username': m['username'], 'fullName': m['efn']},
           'request': overtimeJson(rm),
