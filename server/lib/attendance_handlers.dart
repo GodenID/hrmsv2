@@ -975,31 +975,21 @@ Router attendanceRouter(Db db, Config cfg) {
             !canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
           throw const _Http(403, 'Anda tidak berhak memproses pengajuan ini.');
         }
-        final upd = await tx.execute(Sql.named('''
-          UPDATE out_of_area_requests SET status=@s, reviewed_by=@b, reviewed_at=now(), reviewer_note=@n
-          WHERE id=@i::uuid RETURNING *
-        '''), parameters: {
-          's': approve ? 'approved' : 'rejected',
-          'b': actor['full_name'],
-          'n': note.isEmpty ? null : note,
-          'i': id,
-        });
-        final rm = upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        // Validasi & penulisan SEBELUM status berubah: pengajuan masih
+        // berstatus pending saat dicek, jadi dirinya sendiri tidak dihitung
+        // sebagai "sudah tercatat".
         if (approve) {
-          // Tulis jam ke riwayat absensi agar clock out / kalender /
-          // rekap mengenali sisi ini tanpa overlay khusus.
-          final reqDate = dateOnly(rm['date'] as DateTime);
-          final reqAt = rm['requested_at'] as DateTime;
+          final reqDate = dateOnly(m['date'] as DateTime);
+          final reqAt = m['requested_at'] as DateTime;
           final loc =
-              '${(rm['nearest_location'] ?? 'Luar area').toString()} (luar area)';
+              '${(m['nearest_location'] ?? 'Luar area').toString()} (luar area)';
           final ds = reqDate.toIso8601String().substring(0, 10);
-          // Sisi efektif (riwayat ATAU yang sudah disetujui): koreksi yang
-          // disetujui lebih dulu ikut diakui agar tidak "belum ada clock in".
           final eff = await effectiveSides(
               tx, (m['user_id'] as Object).toString(), ds);
-          if (rm['kind'] == 'clockIn') {
+          if (m['kind'] == 'clockIn') {
             if (eff.ci != null) {
-              throw const _Http(400, 'Jam clock in sudah tercatat. Muat ulang untuk melihat status terbaru.');
+              throw const _Http(400,
+                  'Jam clock in sudah tercatat. Muat ulang untuk melihat status terbaru.');
             }
             await tx.execute(Sql.named('''
               INSERT INTO attendance_records(user_id, date, clock_in, clock_in_location)
@@ -1016,7 +1006,8 @@ Router attendanceRouter(Db db, Config cfg) {
               throw const _Http(400, 'Belum ada clock in pada tanggal ini.');
             }
             if (eff.co != null) {
-              throw const _Http(400, 'Jam clock out sudah tercatat. Muat ulang untuk melihat status terbaru.');
+              throw const _Http(400,
+                  'Jam clock out sudah tercatat. Muat ulang untuk melihat status terbaru.');
             }
             await tx.execute(Sql.named('''
               INSERT INTO attendance_records(user_id, date, clock_out, clock_out_location)
@@ -1030,6 +1021,17 @@ Router attendanceRouter(Db db, Config cfg) {
             });
           }
         }
+        // Status approval baru diubah setelah jam berhasil ditulis.
+        final upd = await tx.execute(Sql.named('''
+          UPDATE out_of_area_requests SET status=@s, reviewed_by=@b, reviewed_at=now(), reviewer_note=@n
+          WHERE id=@i::uuid RETURNING *
+        '''), parameters: {
+          's': approve ? 'approved' : 'rejected',
+          'b': actor['full_name'],
+          'n': note.isEmpty ? null : note,
+          'i': id,
+        });
+        final rm = upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         await notifyTx(tx, m['username'] as String,
             kind: approve ? 'outOfAreaApproved' : 'outOfAreaRejected',
             title: approve ? 'Pengajuan luar area disetujui' : 'Pengajuan luar area ditolak',
