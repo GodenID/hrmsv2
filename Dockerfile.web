@@ -1,9 +1,18 @@
 # Web Prasasti Connect: build Flutter web -> sajikan via nginx.
-# API_BASE_URL dibakar saat build ( Public, bukan rahasia ).
+# API_BASE_URL dibakar saat build (publik, bukan rahasia).
 ARG API_BASE_URL=https://apihrms.prasastigroup.id
-ARG FLUTTER_VERSION=3.47.7
+ARG FLUTTER_VERSION=3.47.6
 
-FROM ghcr.io/cirruslabs/flutter:${FLUTTER_VERSION} AS build
+FROM debian:bookworm-slim AS build
+ARG API_BASE_URL
+ARG FLUTTER_VERSION
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git curl unzip xz-utils zip libglu1-mesa \
+    && rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 --branch ${FLUTTER_VERSION} \
+    https://github.com/flutter/flutter.git /opt/flutter
+ENV PATH="/opt/flutter/bin:${PATH}"
+RUN flutter --version
 WORKDIR /app
 COPY pubspec.* ./
 RUN flutter pub get
