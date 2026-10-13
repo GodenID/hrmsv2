@@ -4,6 +4,8 @@
 <dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Lokasi dipakai saat clock in dan clock out untuk memastikan Anda berada di area absen kantor.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Akses galeri dipakai untuk melampirkan foto/bukti pada pengajuan dan profil.</string>
 	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<key>CFBundleDevelopmentRegion</key>
