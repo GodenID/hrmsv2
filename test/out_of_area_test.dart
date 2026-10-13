@@ -221,6 +221,25 @@ void main() {
       );
     });
 
+    test('manager bisa menyetujui pengajuan luar-areanya sendiri', () async {
+      final request = await attendance.submitOutOfArea(
+        manager,
+        kind: OutOfAreaKind.clockIn,
+        position: outside,
+        reason: 'Dinas luar ke venue klien pagi ini.',
+      );
+      expect(request.status, RequestStatus.pending);
+      // Muncul di antreannya sendiri.
+      final queue = await attendance.fetchOutOfAreaQueue(manager);
+      expect(queue.any((i) => i.request.id == request.id), isTrue);
+      final reviewed = await attendance.reviewOutOfArea(
+        manager,
+        id: request.id,
+        approve: true,
+      );
+      expect(reviewed.request.status, RequestStatus.approved);
+    });
+
     test('disetujui keesokan hari tetap masuk riwayat', () async {
       final request = await submitIn();
       now = now.add(const Duration(days: 1));

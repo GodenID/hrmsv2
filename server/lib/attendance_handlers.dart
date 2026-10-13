@@ -865,12 +865,23 @@ Router attendanceRouter(Db db, Config cfg) {
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
         SELECT o.*, u.username, u.full_name, u.role AS urel
         FROM out_of_area_requests o JOIN users u ON u.id=o.user_id
-        WHERE o.status='pending' AND u.username<>@me ORDER BY o.submitted_at
-      '''), parameters: {'me': actor['username']}));
+        WHERE o.status='pending' ORDER BY o.submitted_at
+      ''')));
       final items = <Map<String, dynamic>>[];
+      final selfApprove =
+          actor['role'] == 'manager' || actor['role'] == 'superadmin';
       for (final row in rows) {
         final m = row.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
-        if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) continue;
+        final isSelf =
+            (m['username'] as String).toLowerCase() ==
+            (actor['username'] as String).toLowerCase();
+        // Manager/Super Admin melihat miliknya sendiri untuk disetujui
+        // sendiri; staff tidak.
+        if (isSelf && !selfApprove) continue;
+        if (!isSelf &&
+            !canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
+          continue;
+        }
         items.add({
           'employee': {'username': m['username'], 'fullName': m['full_name']},
           'request': ooaJson(m),
@@ -898,10 +909,17 @@ Router attendanceRouter(Db db, Config cfg) {
         if (cur.isEmpty) throw const _Http(404, 'Pengajuan tidak ditemukan.');
         final m = cur.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         if (m['status'] != 'pending') throw const _Http(400, 'Pengajuan sudah diproses.');
-        if (m['username'] == actor['username']) {
+        final isSelf = (m['username'] as String).toLowerCase() ==
+            (actor['username'] as String).toLowerCase();
+        // Manager & Super Admin boleh menyetujui pengajuannya sendiri
+        // (dinas luar); role lain tidak.
+        if (isSelf &&
+            actor['role'] != 'manager' &&
+            actor['role'] != 'superadmin') {
           throw const _Http(403, 'Anda tidak dapat memproses pengajuan Anda sendiri.');
         }
-        if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
+        if (!isSelf &&
+            !canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
           throw const _Http(403, 'Anda tidak berhak memproses pengajuan ini.');
         }
         final upd = await tx.execute(Sql.named('''

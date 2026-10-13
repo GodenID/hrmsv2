@@ -407,12 +407,22 @@ class _SummaryStrip extends StatelessWidget {
         .length;
     final sickDays = days.where((d) => d.leave?.type == LeaveType.sick).length;
     final attention = days.where((d) => d.needsAttention).length;
+    // Hari kerja periode berjalan yang belum ada absensinya.
+    final notYet = days
+        .where((d) => d.status == AttendanceDayStatus.absent)
+        .length;
 
     final metrics = [
       _Metric(value: '$present', unit: 'hari', label: 'Hadir'),
       _Metric(value: '$late', unit: 'hari', label: 'Terlambat'),
       _Metric(value: '$leaveDays', unit: 'hari', label: 'Cuti & izin'),
       _Metric(value: '$sickDays', unit: 'hari', label: 'Sakit'),
+      _Metric(
+        value: '$notYet',
+        unit: 'hari',
+        label: 'Belum absen',
+        highlight: notYet > 0,
+      ),
       _Metric(
         value: '$attention',
         unit: 'hari',

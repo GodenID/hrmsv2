@@ -905,11 +905,21 @@ class MockAttendanceRepository implements AttendanceRepository {
   ) async {
     await Future<void>.delayed(latency);
     _requireReviewer(actor);
+    final selfApprove =
+        actor.role == UserRole.manager ||
+        actor.role == UserRole.superadmin;
     final pending = <OutOfAreaReviewItem>[];
     final done = <OutOfAreaReviewItem>[];
     for (final entry in store.outOfArea.entries) {
       final account = store.account(entry.key);
-      if (account == null || !store.canActOn(actor, account)) continue;
+      if (account == null) continue;
+      // Manager/Super Admin melihat pengajuannya sendiri agar bisa
+      // menyetujui sendiri; staff tidak.
+      if (account.username == actor.username && !selfApprove) continue;
+      if (account.username != actor.username &&
+          !store.canActOn(actor, account)) {
+        continue;
+      }
       for (final r in entry.value) {
         if (r.status == RequestStatus.cancelled) continue;
         final item = OutOfAreaReviewItem(
@@ -970,12 +980,17 @@ class MockAttendanceRepository implements AttendanceRepository {
     if (account == null || index < 0) {
       throw const AppException('Pengajuan luar area tidak ditemukan.');
     }
-    if (account.username == actor.username) {
+    // Manager & Super Admin boleh menyetujui pengajuannya sendiri
+    // (dinas luar); role lain tidak.
+    if (account.username == actor.username &&
+        actor.role != UserRole.manager &&
+        actor.role != UserRole.superadmin) {
       throw const PermissionDeniedException(
         'Anda tidak dapat memproses pengajuan Anda sendiri.',
       );
     }
-    if (!store.canActOn(actor, account)) {
+    if (account.username != actor.username &&
+        !store.canActOn(actor, account)) {
       throw const PermissionDeniedException(
         'Anda tidak berhak memproses pengajuan karyawan ini.',
       );
