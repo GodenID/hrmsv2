@@ -27,16 +27,18 @@ void main() {
   );
 
   group('countPresentInRange', () {
-    test('tepat waktu + terlambat dihitung, lainnya tidak', () {
+    test('ada jam clock in dihitung (sama dengan strip Absensi)', () {
       final days = [
         day(1, AttendanceDayStatus.onTime),
         day(2, AttendanceDayStatus.late),
-        day(3, AttendanceDayStatus.absent),
-        day(4, AttendanceDayStatus.leave),
+        day(3, AttendanceDayStatus.incomplete),
+        day(4, AttendanceDayStatus.inProgress),
+        day(5, AttendanceDayStatus.absent),
+        day(6, AttendanceDayStatus.leave),
       ];
       final start = DateTime(2026, 9, 26);
       final end = DateTime(2026, 10, 25);
-      expect(countPresentInRange(days, start, end), 2);
+      expect(countPresentInRange(days, start, end), 4);
     });
 
     test('di luar periode tutup buku tidak dihitung', () {

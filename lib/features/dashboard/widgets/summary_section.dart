@@ -13,6 +13,8 @@ import '../../../data/leave_repository.dart';
 import '../../shell/shell_controller.dart';
 
 /// Menghitung hari hadir dalam rentang tutup buku (bukan bulan kalender).
+/// Definisi SAMA dengan strip Absensi: ada jam clock in (tepat waktu,
+/// terlambat, belum clock out, maupun sedang bekerja hari ini).
 int countPresentInRange(
   Iterable<AttendanceDay> days,
   DateTime start,
@@ -24,7 +26,9 @@ int countPresentInRange(
       .where(
         (d) =>
             (d.status == AttendanceDayStatus.onTime ||
-                d.status == AttendanceDayStatus.late) &&
+                d.status == AttendanceDayStatus.late ||
+                d.status == AttendanceDayStatus.incomplete ||
+                d.status == AttendanceDayStatus.inProgress) &&
             !WorkCalendar.dateOnly(d.date).isBefore(s) &&
             !WorkCalendar.dateOnly(d.date).isAfter(e),
       )

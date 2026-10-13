@@ -934,6 +934,52 @@ Router attendanceRouter(Db db, Config cfg) {
           'i': id,
         });
         final rm = upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        if (approve) {
+          // Tulis jam ke riwayat absensi agar clock out / kalender /
+          // rekap mengenali sisi ini tanpa overlay khusus.
+          final reqDate = dateOnly(rm['date'] as DateTime);
+          final reqAt = rm['requested_at'] as DateTime;
+          final loc =
+              '${(rm['nearest_location'] ?? 'Luar area').toString()} (luar area)';
+          final rec = await tx.execute(Sql.named(
+            'SELECT clock_in, clock_out FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
+          ), parameters: {
+            'i': (m['user_id'] as Object).toString(),
+            'd': reqDate.toIso8601String().substring(0, 10),
+          });
+          final has = rec.isNotEmpty ? rec.first.toColumnMap() : null;
+          if (rm['kind'] == 'clockIn') {
+            if (has?['clock_in'] != null) {
+              throw const _Http(400, 'Jam clock in sudah tercatat. Muat ulang untuk melihat status terbaru.');
+            }
+            await tx.execute(Sql.named('''
+              INSERT INTO attendance_records(user_id, date, clock_in, clock_in_location)
+              VALUES(@i::uuid, @d, @t, @l)
+              ON CONFLICT (user_id, date) DO UPDATE SET clock_in=@t, clock_in_location=@l
+            '''), parameters: {
+              'i': (m['user_id'] as Object).toString(),
+              'd': reqDate.toIso8601String().substring(0, 10),
+              't': reqAt.toUtc().toIso8601String(),
+              'l': loc,
+            });
+          } else {
+            if (has == null || has['clock_in'] == null) {
+              throw const _Http(400, 'Belum ada clock in pada tanggal ini.');
+            }
+            if (has['clock_out'] != null) {
+              throw const _Http(400, 'Jam clock out sudah tercatat. Muat ulang untuk melihat status terbaru.');
+            }
+            await tx.execute(Sql.named('''
+              UPDATE attendance_records SET clock_out=@t, clock_out_location=@l
+              WHERE user_id=@i::uuid AND date=@d
+            '''), parameters: {
+              'i': (m['user_id'] as Object).toString(),
+              'd': reqDate.toIso8601String().substring(0, 10),
+              't': reqAt.toUtc().toIso8601String(),
+              'l': loc,
+            });
+          }
+        }
         await notifyTx(tx, m['username'] as String,
             kind: approve ? 'outOfAreaApproved' : 'outOfAreaRejected',
             title: approve ? 'Pengajuan luar area disetujui' : 'Pengajuan luar area ditolak',

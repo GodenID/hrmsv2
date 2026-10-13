@@ -886,8 +886,8 @@ Router notificationRouter(Db db, Config cfg) {
       final sent = await db.pool.runTx((tx) async {
         final rs = await tx.execute(Sql.named('''
           SELECT username, role FROM users
-          WHERE active AND username<>@me ORDER BY full_name
-        '''), parameters: {'me': actor['username']});
+          WHERE active ORDER BY full_name
+        '''));
         var n = 0;
         for (final row in rs) {
           final m = row.toColumnMap();

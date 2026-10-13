@@ -59,12 +59,12 @@ void main() {
         ),
         isTrue,
       );
-      // Pengirim tidak mengirimi diri sendiri.
+      // Pengirim ikut menerima siarannya sendiri.
       expect(
         (await notifications.fetch(superadmin)).any(
           (n) => n.title == 'Apel pagi pindah aula',
         ),
-        isFalse,
+        isTrue,
       );
     });
 

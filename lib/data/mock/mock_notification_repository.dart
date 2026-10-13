@@ -173,7 +173,7 @@ class MockNotificationRepository implements NotificationRepository {
     final sorted = [...store.accounts.values]
       ..sort((a, b) => a.fullName.compareTo(b.fullName));
     for (final a in sorted) {
-      if (!a.active || a.username == actor.username) continue;
+      if (!a.active) continue;
       if (audience == BroadcastAudience.staff && a.role != UserRole.staff) {
         continue;
       }
