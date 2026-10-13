@@ -322,7 +322,12 @@ class _EmployeeRow extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
           child: Row(
             children: [
-              InitialsAvatar(name: e.fullName, size: 36, muted: !e.active),
+              PhotoAvatar(
+                name: e.fullName,
+                photoUrl: e.photoUrl,
+                size: 36,
+                muted: !e.active,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(

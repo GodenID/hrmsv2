@@ -171,7 +171,7 @@ class _DaySheet extends StatelessWidget {
               ),
               if (correction.reviewerNote != null)
                 InfoRow(
-                  label: 'Catatan ${correction.reviewedBy ?? 'Manager'}',
+                  label: 'Catatan ${correction.reviewedBy ?? 'Atasan'}',
                   value: correction.reviewerNote!,
                 ),
             ],
@@ -205,7 +205,7 @@ class _DaySheet extends StatelessWidget {
               ),
               if (outOfArea.reviewerNote != null)
                 InfoRow(
-                  label: 'Catatan ${outOfArea.reviewedBy ?? 'Manager'}',
+                  label: 'Catatan ${outOfArea.reviewedBy ?? 'Atasan'}',
                   value: outOfArea.reviewerNote!,
                 ),
               if (outOfArea.status == RequestStatus.pending) ...[
@@ -240,7 +240,7 @@ class _DaySheet extends StatelessWidget {
               ),
               if (overtime.reviewerNote != null)
                 InfoRow(
-                  label: 'Catatan ${overtime.reviewedBy ?? 'Manager'}',
+                  label: 'Catatan ${overtime.reviewedBy ?? 'Atasan'}',
                   value: overtime.reviewerNote!,
                 ),
             ],

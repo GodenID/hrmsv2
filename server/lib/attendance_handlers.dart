@@ -94,6 +94,19 @@ Map<String, dynamic> ooaJson(Map<String, dynamic> r) => {
       'reviewerNote': r['reviewer_note'],
     };
 
+Map<String, dynamic> overtimeOut(Map<String, dynamic> r) => {
+      'id': (r['id'] as Object).toString(),
+      'date': (r['date'] as DateTime).toIso8601String().substring(0, 10),
+      'start': (r['start_time'] as DateTime).toIso8601String(),
+      'end': (r['end_time'] as DateTime).toIso8601String(),
+      'reason': r['reason'],
+      'status': r['status'],
+      'submittedAt': (r['submitted_at'] as DateTime).toIso8601String(),
+      'reviewedBy': r['reviewed_by'],
+      'reviewedAt': (r['reviewed_at'] as DateTime?)?.toIso8601String(),
+      'reviewerNote': r['reviewer_note'],
+    };
+
 Router attendanceRouter(Db db, Config cfg) {
   final r = Router();
 
@@ -374,6 +387,51 @@ Router attendanceRouter(Db db, Config cfg) {
             'reviewerNote': m['reviewer_note'],
           };
 
+      // Overlay pengajuan milik sendiri sebulan penuh (1 query per jenis):
+      // koreksi / lembur / luar-area terbaru per tanggal.
+      List<Map<String, dynamic>> rowsOf(dynamic rs) => [
+            for (final row in rs)
+              row.toColumnMap().map((k, v) => MapEntry(k.toString(), v)),
+          ];
+      final corrRows = rowsOf(await db.pool.runTx((tx) => tx.execute(Sql.named('''
+        SELECT * FROM attendance_corrections WHERE user_id=@i::uuid
+          AND date>=@s AND date<=@e ORDER BY submitted_at DESC
+      '''), parameters: {
+        'i': (u['id'] as Object).toString(),
+        's': monthStart,
+        'e': monthEnd,
+      })));
+      final otRows = rowsOf(await db.pool.runTx((tx) => tx.execute(Sql.named('''
+        SELECT * FROM overtime_requests WHERE user_id=@i::uuid
+          AND status IN ('pending','approved')
+          AND date>=@s AND date<=@e ORDER BY submitted_at DESC
+      '''), parameters: {
+        'i': (u['id'] as Object).toString(),
+        's': monthStart,
+        'e': monthEnd,
+      })));
+      final ooaRows = rowsOf(await db.pool.runTx((tx) => tx.execute(Sql.named('''
+        SELECT * FROM out_of_area_requests WHERE user_id=@i::uuid
+          AND date>=@s AND date<=@e ORDER BY submitted_at DESC
+      '''), parameters: {
+        'i': (u['id'] as Object).toString(),
+        's': monthStart,
+        'e': monthEnd,
+      })));
+
+      String dayKey(DateTime d) => d.toIso8601String().substring(0, 10);
+
+      Map<String, dynamic>? latestOn(
+          List<Map<String, dynamic>> rows, DateTime date) {
+        final k = dayKey(date);
+        for (final m in rows) {
+          if ((m['date'] as DateTime).toIso8601String().substring(0, 10) == k) {
+            return m;
+          }
+        }
+        return null;
+      }
+
       final out = <Map<String, dynamic>>[];
       for (var d = 1; d <= lastDay; d++) {
         final date = DateTime(year, month, d);
@@ -392,6 +450,9 @@ Router attendanceRouter(Db db, Config cfg) {
         }
         if (isWeekend(date)) continue;
         final lv = leaveOn(date);
+        final corrLatest = latestOn(corrRows, date);
+        final otLatest = latestOn(otRows, date);
+        final ooaLatest = latestOn(ooaRows, date);
         final rows = await db.pool.runTx((tx) => tx.execute(Sql.named(
               'SELECT * FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
             ), parameters: {'i': (u['id'] as Object).toString(), 'd': date.toIso8601String().substring(0, 10)}));
@@ -449,6 +510,9 @@ Router attendanceRouter(Db db, Config cfg) {
           'clockInLocation': cil,
           'clockOutLocation': col,
           'leave': lv == null ? null : leaveOut(lv),
+          'correction': corrLatest == null ? null : correctionJson(corrLatest),
+          'overtime': otLatest == null ? null : overtimeOut(otLatest),
+          'outOfArea': ooaLatest == null ? null : ooaJson(ooaLatest),
         });
       }
       return json({'days': out.reversed.toList()});

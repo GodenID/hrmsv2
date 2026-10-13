@@ -238,7 +238,12 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
             Panel(
               child: Row(
                 children: [
-                  InitialsAvatar(name: e.fullName, size: 56, muted: !e.active),
+                  PhotoAvatar(
+                    name: e.fullName,
+                    photoUrl: e.photoUrl,
+                    size: 56,
+                    muted: !e.active,
+                  ),
                   const SizedBox(width: AppSpacing.lg),
                   Expanded(
                     child: Column(

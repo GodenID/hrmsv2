@@ -9,6 +9,7 @@ import 'package:shelf_router/shelf_router.dart';
 import 'authz.dart';
 import 'config.dart';
 import 'db.dart';
+import 's3.dart';
 import 'validate.dart';
 
 Response json(Object body, {int status = 200}) => Response(
@@ -44,7 +45,12 @@ String tempPassword() {
   return '${chars.sublist(0, 5).join()}-${chars.sublist(5).join()}';
 }
 
-Map<String, dynamic> toAccount(Map<String, dynamic> a, Map<String, dynamic> actor) {
+Map<String, dynamic> toAccount(
+  Map<String, dynamic> a,
+  Map<String, dynamic> actor, [
+  S3Store? s3,
+  bool avatarPublic = true,
+]) {
   final isSuper = actor['role'] == 'superadmin';
   final canEdit = isSuper && canManageRole(actor['role'] as String, a['role'] as String);
   final canActOn = isSuper &&
@@ -83,7 +89,13 @@ Map<String, dynamic> toAccount(Map<String, dynamic> a, Map<String, dynamic> acto
     'canChangeRole': canEdit && a['username'] != actor['username'],
     'canChangeStatus': canActOn,
     'canResetPassword': canActOn && a['active'] == true,
+    'photoUrl': _photoUrl(s3, avatarPublic, a['photo_key'] as String?),
   };
+}
+
+String? _photoUrl(S3Store? s3, bool avatarPublic, String? key) {
+  if (s3 == null || key == null || key.isEmpty) return null;
+  return avatarPublic ? s3.publicUrl(key) : s3.presignGet(key);
 }
 
 String? validateDraft(Map<String, dynamic> b) {
@@ -128,7 +140,7 @@ Router employeeRouter(Db db, Config cfg) {
           ));
       final list = [
         for (final row in rows)
-          toAccount(row.toColumnMap().map((k, v) => MapEntry(k.toString(), v)), actor),
+          toAccount(row.toColumnMap().map((k, v) => MapEntry(k.toString(), v)), actor, storeOf(cfg), cfg.s3avatarPublic),
       ];
       list.removeWhere(
           (e) => actor['role'] != 'superadmin' && (e['role'] == 'superadmin'));
@@ -151,7 +163,7 @@ Router employeeRouter(Db db, Config cfg) {
       if (hiddenFrom(actor, target)) {
         return json({'message': 'Karyawan tidak ditemukan.'}, status: 404);
       }
-      return json(toAccount(target, actor));
+      return json(toAccount(target, actor, storeOf(cfg), cfg.s3avatarPublic));
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }
@@ -216,7 +228,7 @@ Router employeeRouter(Db db, Config cfg) {
         return ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
       });
       return json(
-        {'account': toAccount(created, actor), 'temporaryPassword': password},
+        {'account': toAccount(created, actor, storeOf(cfg), cfg.s3avatarPublic), 'temporaryPassword': password},
         status: 201,
       );
     } on _Http catch (h) {
@@ -281,7 +293,7 @@ Router employeeRouter(Db db, Config cfg) {
         });
         return upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
       });
-      return json(toAccount(updated, actor));
+      return json(toAccount(updated, actor, storeOf(cfg), cfg.s3avatarPublic));
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }
@@ -316,7 +328,7 @@ Router employeeRouter(Db db, Config cfg) {
         }
         return upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
       });
-      return json(toAccount(updated, actor));
+      return json(toAccount(updated, actor, storeOf(cfg), cfg.s3avatarPublic));
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }

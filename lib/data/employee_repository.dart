@@ -81,6 +81,7 @@ class EmployeeAccount {
     this.address,
     this.emergencyContact,
     this.contractMonths,
+    this.photoUrl,
   });
 
   final String username;
@@ -130,6 +131,9 @@ class EmployeeAccount {
   final bool canChangeRole;
   final bool canChangeStatus;
   final bool canResetPassword;
+
+  /// URL foto profil (S3 publik / presigned). null = avatar inisial.
+  final String? photoUrl;
 }
 
 /// Isi formulir tambah / ubah karyawan. Username tidak bisa diubah.

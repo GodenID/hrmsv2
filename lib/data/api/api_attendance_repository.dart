@@ -156,6 +156,19 @@ class ApiAttendanceRepository implements AttendanceRepository {
         reviewerNote: m['reviewerNote'] as String?,
       );
 
+  OvertimeRequest _overtime(Map<String, dynamic> m) => OvertimeRequest(
+        id: (m['id'] ?? '').toString(),
+        date: DateTime.tryParse((m['date'] ?? '').toString()) ?? DateTime.now(),
+        start: _dt(m['start']) ?? DateTime.now(),
+        end: _dt(m['end']) ?? DateTime.now(),
+        reason: (m['reason'] ?? '').toString(),
+        status: _status(m['status']),
+        submittedAt: _dt(m['submittedAt']) ?? DateTime.now(),
+        reviewedBy: m['reviewedBy'] as String?,
+        reviewedAt: _dt(m['reviewedAt']),
+        reviewerNote: m['reviewerNote'] as String?,
+      );
+
   EmployeeRef _ref(Map<String, dynamic> m) => EmployeeRef(
         username: (m['username'] ?? '').toString(),
         fullName: (m['fullName'] ?? '').toString(),
@@ -272,6 +285,15 @@ class ApiAttendanceRepository implements AttendanceRepository {
             clockInLocation: _map(e)['clockInLocation'] as String?,
             clockOutLocation: _map(e)['clockOutLocation'] as String?,
             leave: _leave(_map(e)['leave']),
+            correction: _map(e)['correction'] == null
+                ? null
+                : _correction(_map(_map(e)['correction'])),
+            outOfArea: _map(e)['outOfArea'] == null
+                ? null
+                : _ooa(_map(_map(e)['outOfArea'])),
+            overtime: _map(e)['overtime'] == null
+                ? null
+                : _overtime(_map(_map(e)['overtime'])),
           ),
       ],
     );

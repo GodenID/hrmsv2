@@ -87,6 +87,8 @@ class MockEmployeeRepository implements EmployeeRepository {
       canChangeRole: canEdit && a.username != actor.username,
       canChangeStatus: canActOn,
       canResetPassword: canActOn && a.active,
+      // Mock tidak menyimpan foto (lihat ApiEmployeeRepository untuk S3).
+      photoUrl: null,
     );
   }
 

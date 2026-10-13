@@ -105,6 +105,7 @@ class ApiEmployeeRepository implements EmployeeRepository {
       birthDate: dt(m['birthDate']),
       address: m['address'] as String?,
       emergencyContact: ec,
+      photoUrl: m['photoUrl'] as String?,
     );
   }
 

@@ -262,7 +262,7 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Koreksi diperiksa oleh Manager. Jika disetujui, jam di atas '
+              'Koreksi diperiksa oleh Atasan. Jika disetujui, jam di atas '
               'menggantikan catatan absensi tanggal ini.',
               style: textTheme.bodySmall?.copyWith(height: 1.5),
             ),
