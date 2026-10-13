@@ -28,8 +28,8 @@ abstract class NotificationRepository {
   Future<void> clearAll(AuthUser user);
 
   /// Siaran Super Admin: judul + isi bebas ke [audience].
-  /// Mengembalikan jumlah penerima. Non-Super Admin ditolak server.
-  Future<int> broadcast(
+  /// Mengembalikan (penerima, perangkat push). Non-Super Admin ditolak.
+  Future<({int sent, int devices})> broadcast(
     AuthUser actor, {
     required String title,
     required String body,

@@ -144,7 +144,7 @@ class ApiNotificationRepository implements NotificationRepository {
   }
 
   @override
-  Future<int> broadcast(
+  Future<({int sent, int devices})> broadcast(
     AuthUser actor, {
     required String title,
     required String body,
@@ -171,6 +171,9 @@ class ApiNotificationRepository implements NotificationRepository {
       throw AppException(msg);
     }
     final m = jsonDecode(res.body) as Map<String, dynamic>;
-    return (m['sent'] as num?)?.toInt() ?? 0;
+    return (
+      sent: (m['sent'] as num?)?.toInt() ?? 0,
+      devices: (m['devices'] as num?)?.toInt() ?? 0,
+    );
   }
 }

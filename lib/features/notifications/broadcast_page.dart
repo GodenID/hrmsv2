@@ -46,7 +46,7 @@ class _BroadcastPageState extends State<BroadcastPage> {
     });
     try {
       final title = _titleController.text.trim();
-      final sent = await AppScope.of(context).notifications.broadcast(
+      final result = await AppScope.of(context).notifications.broadcast(
             SessionScope.userOf(context),
             title: title,
             body: _bodyController.text.trim(),
@@ -57,7 +57,9 @@ class _BroadcastPageState extends State<BroadcastPage> {
       await showSuccessSheet(
         context,
         title: 'Siaran terkirim',
-        message: '$sent karyawan menerima "$title". Terkirim realtime.',
+        message:
+            '${result.sent} karyawan menerima "$title" '
+            '(${result.devices} perangkat push). Terkirim realtime.',
       );
       if (!mounted) return;
       setState(() {

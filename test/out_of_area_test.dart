@@ -148,6 +148,26 @@ void main() {
         attendanceError('sudah clock in'),
       );
     });
+
+    test('jam yang disetujui diakui validasi sisi', () async {
+      // Clock in disetujui (luar area) -> clock out boleh diajukan
+      // maupun dicatat biasa, tanpa "clock in dulu".
+      final request = await submitIn();
+      await attendance.reviewOutOfArea(
+        manager,
+        id: request.id,
+        approve: true,
+      );
+      final out = await attendance.submitOutOfArea(
+        staff,
+        kind: OutOfAreaKind.clockOut,
+        position: outside,
+        reason: 'Pulang dari venue klien sore ini.',
+      );
+      expect(out.status, RequestStatus.pending);
+      final record = await attendance.clockOut(staff, position: inside);
+      expect(record.clockOut, isNotNull);
+    });
   });
 
   group('review', () {

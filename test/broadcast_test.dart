@@ -38,15 +38,15 @@ void main() {
   }
 
   group('siaran', () {
-    test('ke semua karyawan kecuali pengirim', () async {
+    test('ke semua karyawan termasuk pengirim', () async {
       await clearAll();
-      final sent = await notifications.broadcast(
+      final result = await notifications.broadcast(
         superadmin,
         title: 'Apel pagi pindah aula',
         body: 'Mulai besok apel di aula utama.',
         audience: BroadcastAudience.all,
       );
-      expect(sent, greaterThan(0));
+      expect(result.sent, greaterThan(0));
       expect(
         (await notifications.fetch(staff)).any(
           (n) => n.title == 'Apel pagi pindah aula',
@@ -70,13 +70,13 @@ void main() {
 
     test('sasaran staff saja', () async {
       await clearAll();
-      final sent = await notifications.broadcast(
+      final result = await notifications.broadcast(
         superadmin,
         title: 'Khusus staff',
         body: 'Isi untuk staff.',
         audience: BroadcastAudience.staff,
       );
-      expect(sent, greaterThan(0));
+      expect(result.sent, greaterThan(0));
       expect(
         (await notifications.fetch(staff)).any(
           (n) => n.title == 'Khusus staff',

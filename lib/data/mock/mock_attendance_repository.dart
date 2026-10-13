@@ -98,10 +98,11 @@ class MockAttendanceRepository implements AttendanceRepository {
   }) async {
     await Future<void>.delayed(latency);
     final record = _currentToday(user.username);
-    if (record.clockIn == null) {
+    final eff = _effectiveToday(user.username);
+    if (eff.$1 == null) {
       throw const AppException('Silakan clock in terlebih dahulu.');
     }
-    if (record.clockOut != null) {
+    if (eff.$2 != null) {
       throw const AppException('Anda sudah clock out hari ini.');
     }
     final place = _requireInsideArea(position);
@@ -760,6 +761,29 @@ class MockAttendanceRepository implements AttendanceRepository {
   // Pengajuan luar area
   // ---------------------------------------------------------------------------
 
+  /// Sisi efektif hari ini: catatan ATAU yang sudah disetujui.
+  /// Dipakai validasi agar jam approve diakui.
+  (DateTime? ci, DateTime? co) _effectiveToday(String username) {
+    final r = _currentToday(username);
+    DateTime? ci = r.clockIn;
+    DateTime? co = r.clockOut;
+    for (final o in store.outOfArea[username] ?? const <OutOfAreaRequest>[]) {
+      if (o.status != RequestStatus.approved) continue;
+      if (!WorkCalendar.isSameDay(o.date, _today)) continue;
+      if (o.kind == OutOfAreaKind.clockIn) {
+        ci = o.requestedAt;
+      } else {
+        co = o.requestedAt;
+      }
+    }
+    final approved = _approvedCorrection(username, _today);
+    if (approved != null) {
+      ci = approved.clockIn;
+      co = approved.clockOut;
+    }
+    return (ci, co);
+  }
+
   /// Lokasi absen terdekat dari [p] (null bila belum ada lokasi sama sekali).
   AttendanceLocation? _nearestLocation(GeoPoint p) {
     AttendanceLocation? best;
@@ -810,16 +834,19 @@ class MockAttendanceRepository implements AttendanceRepository {
         'Alasan minimal ${OutOfAreaRules.minReasonLength} karakter.',
       );
     }
-    final record = _currentToday(user.username);
     final isIn = kind == OutOfAreaKind.clockIn;
-    if (isIn && record.clockIn != null) {
+    final eff = _effectiveToday(user.username);
+    if (isIn && eff.$1 != null) {
       throw const AppException('Jam clock in hari ini sudah tercatat.');
     }
-    if (!isIn && (record.clockIn == null || record.clockOut != null)) {
+    if (!isIn && eff.$1 == null) {
       throw const AppException(
         'Clock out luar area hanya bisa diajukan bila sudah clock in '
         'dan belum clock out.',
       );
+    }
+    if (!isIn && eff.$2 != null) {
+      throw const AppException('Jam clock out hari ini sudah tercatat.');
     }
     final list = store.outOfArea.putIfAbsent(user.username, () => []);
     final nearest = _nearestLocation(position)!;

@@ -151,7 +151,7 @@ class MockNotificationRepository implements NotificationRepository {
   }
 
   @override
-  Future<int> broadcast(
+  Future<({int sent, int devices})> broadcast(
     AuthUser actor, {
     required String title,
     required String body,
@@ -190,6 +190,6 @@ class MockNotificationRepository implements NotificationRepository {
       );
       sent++;
     }
-    return sent;
+    return (sent: sent, devices: 0);
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:googleapis_auth/auth_io.dart' as auth;
 import 'package:http/http.dart' as http;
@@ -61,8 +62,11 @@ class FcmSender {
       );
       if (res.statusCode == 200) return true;
       if (res.statusCode == 404) return false;
+      stderr.writeln(
+          'FCM gagal ${res.statusCode} [$kind]: ${res.body.substring(0, res.body.length.clamp(0, 200))}');
       return true;
-    } catch (_) {
+    } catch (e) {
+      stderr.writeln('FCM exception [$kind]: $e');
       return true;
     }
   }

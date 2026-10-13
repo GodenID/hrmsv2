@@ -47,8 +47,7 @@ String fmtDist(double m) {
   return '${t.replaceAll('.', ',')} km';
 }
 
-Map<String, dynamic> locJson(Map<String, dynamic> r) => {
-      'id': r['id'],
+Map<String, dynamic> locJson(Map<String, dynamic> r) => {      'id': r['id'],
       'name': r['name'],
       'latitude': r['latitude'],
       'longitude': r['longitude'],
@@ -106,6 +105,49 @@ Map<String, dynamic> overtimeOut(Map<String, dynamic> r) => {
       'reviewedAt': isoUtcOpt(r['reviewed_at'] as DateTime?),
       'reviewerNote': r['reviewer_note'],
     };
+
+/// Sisi efektif hari ini: catatan riwayat ATAU yang sudah disetujui
+/// (luar-area per sisi, koreksi). Dipakai validasi agar jam yang disetujui
+/// diakui tanpa menunggu tulis manual.
+Future<({DateTime? ci, DateTime? co})> effectiveSides(
+  TxSession tx,
+  String userId,
+  String day,
+) async {
+  DateTime? ci;
+  DateTime? co;
+  final rec = await tx.execute(Sql.named(
+    'SELECT clock_in, clock_out FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
+  ), parameters: {'i': userId, 'd': day});
+  if (rec.isNotEmpty) {
+    final m = rec.first.toColumnMap();
+    ci = m['clock_in'] as DateTime?;
+    co = m['clock_out'] as DateTime?;
+  }
+  final ooa = await tx.execute(Sql.named('''
+    SELECT kind, requested_at FROM out_of_area_requests
+    WHERE user_id=@i::uuid AND date=@d AND status='approved'
+  '''), parameters: {'i': userId, 'd': day});
+  for (final row in ooa) {
+    final m = row.toColumnMap();
+    if (m['kind'] == 'clockIn') {
+      ci = m['requested_at'] as DateTime;
+    } else {
+      co = m['requested_at'] as DateTime;
+    }
+  }
+  final corr = await tx.execute(Sql.named('''
+    SELECT clock_in, clock_out FROM attendance_corrections
+    WHERE user_id=@i::uuid AND date=@d AND status='approved'
+    ORDER BY submitted_at DESC LIMIT 1
+  '''), parameters: {'i': userId, 'd': day});
+  if (corr.isNotEmpty) {
+    final m = corr.first.toColumnMap();
+    ci = m['clock_in'] as DateTime;
+    co = m['clock_out'] as DateTime;
+  }
+  return (ci: ci, co: co);
+}
 
 Router attendanceRouter(Db db, Config cfg) {
   final r = Router();
@@ -296,18 +338,22 @@ Router attendanceRouter(Db db, Config cfg) {
       final mocked = b['isMocked'] == true;
       final nowWib = DateTime.now().toUtc().add(const Duration(hours: 7));
       final today = dateOnly(nowWib);
+      final day = today.toIso8601String().substring(0, 10);
       final rec = await db.pool.runTx((tx) async {
         final cur = await tx.execute(Sql.named(
           'SELECT * FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
-        ), parameters: {'i': (u['id'] as Object).toString(), 'd': today.toIso8601String().substring(0, 10)});
+        ), parameters: {'i': (u['id'] as Object).toString(), 'd': day});
         Map<String, dynamic>? m = cur.isEmpty
             ? null
             : cur.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        // Sisi efektif: catatan ATAU yang sudah disetujui hari ini.
+        final eff = await effectiveSides(
+            tx, (u['id'] as Object).toString(), day);
         if (isIn && m?['clock_in'] != null) throw const _Http(400, 'Anda sudah clock in hari ini.');
-        if (!isIn && m?['clock_in'] == null) {
+        if (!isIn && eff.ci == null) {
           throw const _Http(400, 'Silakan clock in terlebih dahulu.');
         }
-        if (!isIn && m?['clock_out'] != null) {
+        if (!isIn && eff.co != null) {
           throw const _Http(400, 'Anda sudah clock out hari ini.');
         }
         final (loc, _) = await requireInside(lat, lng, mocked, acc);
@@ -764,22 +810,16 @@ Router attendanceRouter(Db db, Config cfg) {
         }
       }
       final result = await db.pool.runTx((tx) async {
-        final rec = await tx.execute(Sql.named(
-          'SELECT * FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
-        ), parameters: {'i': (u['id'] as Object).toString(), 'd': today.toIso8601String().substring(0, 10)});
-        if (rec.isNotEmpty) {
-          final m = rec.first.toColumnMap();
-          if (kind == 'clockIn' && m['clock_in'] != null) {
-            throw const _Http(400, 'Jam masuk hari ini sudah tercatat.');
-          }
-          if (kind == 'clockOut' && m['clock_out'] != null) {
-            throw const _Http(400, 'Jam pulang hari ini sudah tercatat.');
-          }
-          if (kind == 'clockOut' && m['clock_in'] == null) {
-            throw const _Http(400, 'Silakan clock in terlebih dahulu.');
-          }
-        } else if (kind == 'clockOut') {
+        final eff = await effectiveSides(
+            tx, (u['id'] as Object).toString(), today.toIso8601String().substring(0, 10));
+        if (kind == 'clockIn' && eff.ci != null) {
+          throw const _Http(400, 'Jam masuk hari ini sudah tercatat.');
+        }
+        if (kind == 'clockOut' && eff.ci == null) {
           throw const _Http(400, 'Silakan clock in terlebih dahulu.');
+        }
+        if (kind == 'clockOut' && eff.co != null) {
+          throw const _Http(400, 'Jam pulang hari ini sudah tercatat.');
         }
         final dup = await tx.execute(Sql.named('''
           SELECT id FROM out_of_area_requests

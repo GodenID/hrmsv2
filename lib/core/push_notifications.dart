@@ -3,8 +3,20 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../features/shell/shell_controller.dart';
+
+/// Kanal notifikasi sistem (Android 8+): pentingnya tinggi agar tampil
+/// di luar aplikasi seperti aplikasi lain (heads-up + suara).
+const _channel = AndroidNotificationChannel(
+  'prasasti_high',
+  'Notifikasi',
+  description: 'Pengajuan, persetujuan, dan siaran Prasasti Connect.',
+  importance: Importance.max,
+);
+
+final _local = FlutterLocalNotificationsPlugin();
 
 /// Push notification FCM. Tanpa file google-services (Android) /
 /// GoogleService-Info.plist (iOS), semuanya nonaktif anggun.
@@ -30,6 +42,25 @@ abstract final class PushNotifications {
       await Firebase.initializeApp();
       final messaging = FirebaseMessaging.instance;
       await messaging.requestPermission();
+      // Kanal sistem + tampilkan pesan foreground sebagai notifikasi
+      // (bukan cuma snackbar di dalam aplikasi).
+      await _local.initialize(
+        const InitializationSettings(
+          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          iOS: DarwinInitializationSettings(),
+        ),
+        onDidReceiveNotificationResponse: (r) => _openApprovals(),
+      );
+      await _local
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >()
+          ?.createNotificationChannel(_channel);
+      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
       final token = await messaging.getToken();
       final session = await readToken();
       if (token != null && token.isNotEmpty && session != null) {
@@ -44,19 +75,31 @@ abstract final class PushNotifications {
           await syncToken(t, Platform.operatingSystem);
         } catch (_) {}
       });
-      // Foreground: sistem tidak menampilkan banner; tampilkan snackbar
-      // + segarkan semua tampilan terkait (realtime tanpa refresh manual).
-      FirebaseMessaging.onMessage.listen((m) {
+      // Foreground: tampilkan sebagai notifikasi sistem (tray) seperti
+      // aplikasi lain + segarkan semua tampilan terkait (realtime).
+      FirebaseMessaging.onMessage.listen((m) async {
         AppRefresh.pingForKind((m.data['kind'] ?? '').toString());
         final title =
             m.notification?.title ?? m.data['title'] ?? 'Notifikasi baru';
         final body = m.notification?.body ?? m.data['body'] ?? '';
-        messengerKey.currentState?.showSnackBar(
-          SnackBar(
-            content: Text(body.isEmpty ? title : '$title — $body'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        try {
+          await _local.show(
+            body.hashCode ^ title.hashCode,
+            title,
+            body.isEmpty ? null : body,
+            NotificationDetails(
+              android: AndroidNotificationDetails(
+                _channel.id,
+                _channel.name,
+                channelDescription: _channel.description,
+                importance: Importance.max,
+                priority: Priority.high,
+              ),
+              iOS: const DarwinNotificationDetails(),
+            ),
+            payload: (m.data['kind'] ?? '').toString(),
+          );
+        } catch (_) {}
       });
       // Ketuk banner/tray: buka menu Persetujuan (daftar antrean).
       FirebaseMessaging.onMessageOpenedApp.listen(_openFromMessage);
@@ -89,9 +132,13 @@ abstract final class PushNotifications {
     // Hanya pengajuan (reviewRequested) yang punya menu tujuan pasti.
     // Detail spesifik dibuka dari halaman Notifikasi di aplikasi.
     if ((m.data['kind'] ?? '') != 'reviewRequested') return;
+    _openApprovals();
+  }
+
+  static void _openApprovals() {
     final context = navigatorKey.currentContext;
     if (context == null) {
-      _pendingTap = Map<String, String>.from(m.data);
+      _pendingTap = const {'kind': 'reviewRequested'};
       return;
     }
     ShellController.maybeOf(context)?.openTab(ShellTab.approvals);

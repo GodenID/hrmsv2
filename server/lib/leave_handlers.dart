@@ -885,10 +885,10 @@ Router notificationRouter(Db db, Config cfg) {
       }
       final sent = await db.pool.runTx((tx) async {
         final rs = await tx.execute(Sql.named('''
-          SELECT username, role FROM users
+          SELECT username, role, id FROM users
           WHERE active ORDER BY full_name
         '''));
-        var n = 0;
+        final targets = <String>[];
         for (final row in rs) {
           final m = row.toColumnMap();
           final role = (m['role'] ?? 'staff') as String;
@@ -896,16 +896,29 @@ Router notificationRouter(Db db, Config cfg) {
           if (audience == 'managers' && role != 'manager' && role != 'superadmin') {
             continue;
           }
-          await notifyTx(tx, m['username'] as String,
-              kind: 'announcement', title: title, body: body);
-          n++;
+          targets.add(m['username'] as String);
         }
-        return n;
+        for (final username in targets) {
+          await notifyTx(tx, username,
+              kind: 'announcement', title: title, body: body);
+        }
+        var devices = 0;
+        if (targets.isNotEmpty) {
+          final dc = await tx.execute(Sql.named('''
+            SELECT COUNT(DISTINCT f.token) AS c FROM fcm_tokens f
+            JOIN users u ON u.id=f.user_id WHERE u.username = ANY(@ns)
+          '''), parameters: {
+            'ns': targets,
+          });
+          devices =
+              int.tryParse((dc.first.toColumnMap()['c'] as Object).toString()) ?? 0;
+        }
+        return (sent: targets.length, devices: devices);
       });
-      if (sent == 0) {
+      if (sent.sent == 0) {
         return json({'message': 'Tidak ada penerima yang cocok.'}, status: 422);
       }
-      return json({'sent': sent});
+      return json({'sent': sent.sent, 'devices': sent.devices});
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }
