@@ -145,6 +145,8 @@ class MockStore {
     DateTime? at,
     bool read = false,
     String? id,
+    String? refType,
+    String? refId,
   }) {
     notifications
         .putIfAbsent(username, () => [])
@@ -156,6 +158,8 @@ class MockStore {
             body: body,
             createdAt: at ?? now(),
             read: read,
+            refType: refType,
+            refId: refId,
           ),
         );
     notificationChanges.ping();
@@ -563,6 +567,8 @@ class MockNotification {
     required this.body,
     required this.createdAt,
     required this.read,
+    this.refType,
+    this.refId,
   });
 
   final String id;
@@ -571,6 +577,8 @@ class MockNotification {
   final String body;
   final DateTime createdAt;
   bool read;
+  final String? refType;
+  final String? refId;
 
   AppNotification toNotification() => AppNotification(
     id: id,
@@ -579,6 +587,8 @@ class MockNotification {
     body: body,
     createdAt: createdAt,
     read: read,
+    refType: refType,
+    refId: refId,
   );
 }
 

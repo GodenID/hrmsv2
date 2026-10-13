@@ -832,7 +832,9 @@ Router attendanceRouter(Db db, Config cfg) {
           await notifyTx(tx, rev['username'] as String,
               kind: 'reviewRequested',
               title: 'Pengajuan luar area baru',
-              body: '${u['full_name']} mengajukan clock dari luar area.');
+              body: '${u['full_name']} mengajukan clock dari luar area.',
+              refType: 'outOfArea',
+              refId: (row['id'] as Object).toString());
         }
         return (row: row, updated: false);
       });

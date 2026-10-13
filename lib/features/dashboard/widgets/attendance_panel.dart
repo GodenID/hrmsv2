@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/app_scope.dart';
 import '../../../core/platform_services.dart';
+import '../../../core/push_notifications.dart';
 import '../../../core/theme/theme_colors.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/utils/app_haptics.dart';
@@ -36,7 +37,8 @@ class AttendancePanel extends StatefulWidget {
   State<AttendancePanel> createState() => _AttendancePanelState();
 }
 
-class _AttendancePanelState extends State<AttendancePanel> {
+class _AttendancePanelState extends State<AttendancePanel>
+    with WidgetsBindingObserver {
   AttendanceRecord? _record;
   List<OutOfAreaRequest> _outOfArea = [];
   bool _isLoading = true;
@@ -54,14 +56,40 @@ class _AttendancePanelState extends State<AttendancePanel> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    // Muat ulang otomatis: disetujui di perangkat ini (perubahan repo)
+    // maupun push dari Atasan (mis. pengajuan kita disetujui) — tanpa
+    // refresh manual.
+    widget.repository.changes.addListener(_reloadSilent);
+    AppRefresh.attendance.addListener(_reloadSilent);
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _loadError = null;
-    });
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    widget.repository.changes.removeListener(_reloadSilent);
+    AppRefresh.attendance.removeListener(_reloadSilent);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Kembali dari notifikasi/push: segarkan tanpa spinner.
+    if (state == AppLifecycleState.resumed) _reloadSilent();
+  }
+
+  void _reloadSilent() {
+    if (mounted) _load(silent: true);
+  }
+
+  Future<void> _load({bool silent = false}) async {
+    if (!silent) {
+      setState(() {
+        _isLoading = true;
+        _loadError = null;
+      });
+    }
     try {
       final record = await widget.repository.fetchToday(widget.user);
       if (!mounted) return;

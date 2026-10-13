@@ -742,6 +742,8 @@ Router notificationRouter(Db db, Config cfg) {
         'body': m['body'],
         'createdAt': isoUtc(m['created_at'] as DateTime),
         'read': m['read'],
+        'refType': m['ref_type'],
+        'refId': m['ref_id'] == null ? null : (m['ref_id'] as Object).toString(),
       };
 
   r.get('/notifications', (Request req) async {

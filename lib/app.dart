@@ -26,6 +26,7 @@ class PrasastiConnectApp extends StatelessWidget {
         title: AppInfo.appName,
         debugShowCheckedModeBanner: false,
         scaffoldMessengerKey: PushNotifications.messengerKey,
+        navigatorKey: PushNotifications.navigatorKey,
         theme: AppTheme.light(),
         // Kalender, pemilih jam, dan teks bawaan Material dalam Bahasa
         // Indonesia.

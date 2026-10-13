@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
+import '../../core/push_notifications.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/widgets/brand_mark.dart';
 import '../../core/widgets/page_scaffold.dart';
@@ -188,6 +189,8 @@ class _AppShellState extends State<AppShell> {
       repository: AppScope.of(context).profile,
       user: _user,
     )..load();
+    // Ketukan notifikasi saat aplikasi mati: buka menu Persetujuan.
+    PushNotifications.consumePendingTap(context);
   }
 
   @override

@@ -31,10 +31,20 @@ class FcmSender {
   }
 
   /// Kirim ke satu token. false = token mati (penerima hapus).
-  Future<bool> send(String token, String title, String body, String kind) async {
+  Future<bool> send(
+    String token,
+    String title,
+    String body,
+    String kind, {
+    String? refType,
+    String? refId,
+  }) async {
     if (!enabled) return true;
     try {
       await _ensure();
+      final data = <String, String>{'kind': kind};
+      if (refType != null) data['refType'] = refType;
+      if (refId != null) data['refId'] = refId;
       final res = await _client!.post(
         Uri.parse(
           'https://fcm.googleapis.com/v1/projects/${cfg.fcmProjectId}/messages:send',
@@ -45,7 +55,7 @@ class FcmSender {
             'token': token,
             'notification': {'title': title, 'body': body},
             'android': {'priority': 'HIGH'},
-            'data': {'kind': kind},
+            'data': data,
           },
         }),
       );

@@ -4,10 +4,16 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 
+import '../features/shell/shell_controller.dart';
+
 /// Push notification FCM. Tanpa file google-services (Android) /
 /// GoogleService-Info.plist (iOS), semuanya nonaktif anggun.
 abstract final class PushNotifications {
   static final messengerKey = GlobalKey<ScaffoldMessengerState>();
+  static final navigatorKey = GlobalKey<NavigatorState>();
+
+  /// Deep link tertunda dari ketukan notifikasi saat aplikasi mati.
+  static Map<String, String>? _pendingTap;
 
   static bool _ready = false;
 
@@ -38,8 +44,10 @@ abstract final class PushNotifications {
           await syncToken(t, Platform.operatingSystem);
         } catch (_) {}
       });
-      // Foreground: sistem tidak menampilkan banner; tampilkan snackbar.
+      // Foreground: sistem tidak menampilkan banner; tampilkan snackbar
+      // + segarkan panel absensi (jam yang baru disetujui langsung tampil).
       FirebaseMessaging.onMessage.listen((m) {
+        AppRefresh.pingAttendance();
         final title =
             m.notification?.title ?? m.data['title'] ?? 'Notifikasi baru';
         final body = m.notification?.body ?? m.data['body'] ?? '';
@@ -49,6 +57,11 @@ abstract final class PushNotifications {
             behavior: SnackBarBehavior.floating,
           ),
         );
+      });
+      // Ketuk banner/tray: buka menu Persetujuan (daftar antrean).
+      FirebaseMessaging.onMessageOpenedApp.listen(_openFromMessage);
+      FirebaseMessaging.instance.getInitialMessage().then((m) {
+        if (m != null) _pendingTap = Map<String, String>.from(m.data);
       });
       _ready = true;
     } catch (_) {
@@ -71,4 +84,33 @@ abstract final class PushNotifications {
       }
     } catch (_) {}
   }
+
+  static void _openFromMessage(RemoteMessage m) {
+    // Hanya pengajuan (reviewRequested) yang punya menu tujuan pasti.
+    // Detail spesifik dibuka dari halaman Notifikasi di aplikasi.
+    if ((m.data['kind'] ?? '') != 'reviewRequested') return;
+    final context = navigatorKey.currentContext;
+    if (context == null) {
+      _pendingTap = Map<String, String>.from(m.data);
+      return;
+    }
+    ShellController.maybeOf(context)?.openTab(ShellTab.approvals);
+  }
+
+  /// Dipanggil shell setelah login: buka Persetujuan bila ada ketukan
+  /// tertunda dari tray saat aplikasi mati.
+  static void consumePendingTap(BuildContext context) {
+    final pending = _pendingTap;
+    if (pending == null) return;
+    _pendingTap = null;
+    if ((pending['kind'] ?? '') != 'reviewRequested') return;
+    ShellController.maybeOf(context)?.openTab(ShellTab.approvals);
+  }
+}
+
+/// Pemicu muat-ulang lintas halaman (mis. push masuk saat aplikasi terbuka).
+abstract final class AppRefresh {
+  static final attendance = ValueNotifier<int>(0);
+
+  static void pingAttendance() => attendance.value++;
 }

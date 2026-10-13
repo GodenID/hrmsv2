@@ -60,6 +60,8 @@ class ApiNotificationRepository implements NotificationRepository {
         createdAt:
             apiDateTime(m['createdAt']),
         read: (m['read'] as bool?) ?? false,
+        refType: m['refType'] as String?,
+        refId: m['refId'] as String?,
       );
 
   @override

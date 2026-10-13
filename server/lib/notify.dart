@@ -23,12 +23,21 @@ Future<void> notifyTx(
   required String kind,
   required String title,
   required String body,
+  String? refType,
+  String? refId,
 }) async {
   await tx.execute(
     Sql.named(
-      'INSERT INTO notifications(username, kind, title, body) VALUES(@u,@k,@t,@b)',
+      'INSERT INTO notifications(username, kind, title, body, ref_type, ref_id) VALUES(@u,@k,@t,@b,@rt,@ri)',
     ),
-    parameters: {'u': username, 'k': kind, 't': title, 'b': body},
+    parameters: {
+      'u': username,
+      'k': kind,
+      't': title,
+      'b': body,
+      'rt': refType,
+      'ri': refId,
+    },
   );
   // Push best-effort: token mati / FCM mati / timeout tidak menggagalkan.
   final sender = PushBus.fcm;
@@ -44,7 +53,7 @@ Future<void> notifyTx(
       final token = (row.toColumnMap()['token'] ?? '').toString();
       if (token.isEmpty) continue;
       final alive = await sender
-          .send(token, title, body, kind)
+          .send(token, title, body, kind, refType: refType, refId: refId)
           .timeout(const Duration(seconds: 10), onTimeout: () => true);
       if (!alive) {
         await tx.execute(Sql.named('DELETE FROM fcm_tokens WHERE token=@t'),

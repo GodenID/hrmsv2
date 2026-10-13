@@ -7,9 +7,11 @@ import '../../core/utils/date_format_id.dart';
 import '../../core/widgets/page_scaffold.dart';
 import '../../core/widgets/panel.dart';
 import '../../core/widgets/segment_toggle.dart';
-import '../../data/app_exception.dart';
+import '../../data/attendance_repository.dart';
+import '../../data/auth_repository.dart';
 import '../../data/notification_repository.dart';
 import '../shell/shell_controller.dart';
+import '../shell/shell_routes.dart';
 
 /// Daftar notifikasi. Mengetuk notifikasi menandainya sudah dibaca lalu
 /// membuka menu terkait (mis. Cuti, Persetujuan).
@@ -151,6 +153,13 @@ class _NotificationsPageState extends State<NotificationsPage> {
       }
     }
     if (!mounted) return;
+    // Pengajuan luar-area: langsung ke detail pengajuannya.
+    if (n.kind == NotificationKind.reviewRequested &&
+        n.refType == 'outOfArea' &&
+        n.refId != null &&
+        await _openOutOfAreaRequest(navigator, user, n.refId!)) {
+      return;
+    }
     navigator.pop();
     shell?.openTab(switch (n.kind.target) {
       NotificationTarget.dashboard => ShellTab.dashboard,
@@ -161,6 +170,35 @@ class _NotificationsPageState extends State<NotificationsPage> {
       NotificationTarget.employees => ShellTab.employees,
       NotificationTarget.warnings => ShellTab.warnings,
     });
+  }
+
+  /// Buka halaman review pengajuan luar-area [requestId].
+  /// false = tidak ketemu (mis. sudah diproses) → fallback menu biasa.
+  Future<bool> _openOutOfAreaRequest(
+    NavigatorState navigator,
+    AuthUser user,
+    String requestId,
+  ) async {
+    try {
+      final queue = await AppScope.of(context)
+          .attendance
+          .fetchOutOfAreaQueue(user);
+      OutOfAreaReviewItem? found;
+      for (final item in queue) {
+        if (item.request.id == requestId) {
+          found = item;
+          break;
+        }
+      }
+      if (found == null || !mounted) return false;
+      await navigator.pushNamed(
+        ShellRoutes.outOfAreaReview,
+        arguments: found,
+      );
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
   @override

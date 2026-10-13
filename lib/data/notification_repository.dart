@@ -109,6 +109,8 @@ class AppNotification {
     required this.body,
     required this.createdAt,
     required this.read,
+    this.refType,
+    this.refId,
   });
 
   final String id;
@@ -117,4 +119,9 @@ class AppNotification {
   final String body;
   final DateTime createdAt;
   final bool read;
+
+  /// Tautan ke pengajuan spesifik (mis. refType=outOfArea, refId=id).
+  /// null = buka menu tujuan saja.
+  final String? refType;
+  final String? refId;
 }

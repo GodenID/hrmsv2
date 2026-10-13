@@ -885,6 +885,8 @@ class MockAttendanceRepository implements AttendanceRepository {
               '${requester.fullName} mengajukan ${kind.label.toLowerCase()} '
               'luar area (${GeoMath.formatDistance(request.distanceMeters)} '
               'dari ${nearest.name}).',
+          refType: 'outOfArea',
+          refId: request.id,
         );
       }
     }
