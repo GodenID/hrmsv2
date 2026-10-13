@@ -11,17 +11,19 @@ import 'data/api/api_notification_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Tanpa --dart-define=API_BASE_URL: mode mock (pengembangan).
-  // Dengan API_BASE_URL: seluruh repository ke server.
+  // Build production/web semua via API. Mock hanya dipakai di test doubles.
   final baseUrl = ApiConfig.baseUrl;
-  final dependencies = baseUrl.isEmpty
-      ? AppDependencies.mock(
-          sessionStorage: SharedPrefsSessionStorage(),
-        )
-      : AppDependencies.api(
-          baseUrl: baseUrl,
-          sessionStorage: SharedPrefsSessionStorage(),
-        );
+  if (baseUrl.isEmpty) {
+    // Production build harus selalu terhubung ke server.
+    throw StateError(
+      'API_BASE_URL wajib diisi untuk build production '
+      '(--dart-define=API_BASE_URL=https://apihrms.prasastigroup.id).',
+    );
+  }
+  final dependencies = AppDependencies.api(
+    baseUrl: baseUrl,
+    sessionStorage: SharedPrefsSessionStorage(),
+  );
   runApp(PrasastiConnectApp(dependencies: dependencies));
   // Push: nonblokir & nonfatal. Tanpa file Firebase, diam-diam nonaktif.
   if (dependencies.notifications is ApiNotificationRepository) {
