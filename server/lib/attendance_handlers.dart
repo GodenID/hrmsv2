@@ -234,13 +234,52 @@ Router attendanceRouter(Db db, Config cfg) {
     try {
       final u = await me(req);
       final today = dateOnly(DateTime.now().toUtc().add(const Duration(hours: 7)));
-      final rows = await db.pool.runTx((tx) => tx.execute(Sql.named(
-            'SELECT * FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
-          ), parameters: {'i': (u['id'] as Object).toString(), 'd': today.toIso8601String().substring(0, 10)}));
-      final rec = rows.isEmpty
-          ? null
-          : rows.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
-      return json(recordJson(rec, today));
+      final day = today.toIso8601String().substring(0, 10);
+      final rec = await db.pool.runTx((tx) async {
+        final rows = await tx.execute(Sql.named(
+          'SELECT * FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
+        ), parameters: {'i': (u['id'] as Object).toString(), 'd': day});
+        Map<String, dynamic>? m = rows.isEmpty
+            ? null
+            : rows.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        // Yang disetujui hari ini menimpa catatan (jam input pemohon).
+        final ooa = await tx.execute(Sql.named('''
+          SELECT kind, requested_at FROM out_of_area_requests
+          WHERE user_id=@i::uuid AND date=@d AND status='approved'
+        '''), parameters: {'i': (u['id'] as Object).toString(), 'd': day});
+        DateTime? ci = m?['clock_in'] as DateTime?;
+        DateTime? co = m?['clock_out'] as DateTime?;
+        String? cil = m?['clock_in_location'] as String?;
+        String? col = m?['clock_out_location'] as String?;
+        for (final row in ooa) {
+          final om = row.toColumnMap();
+          if (om['kind'] == 'clockIn') {
+            ci = om['requested_at'] as DateTime;
+            cil = cil ?? 'Luar area';
+          } else {
+            co = om['requested_at'] as DateTime;
+            col = col ?? 'Luar area';
+          }
+        }
+        final corr = await tx.execute(Sql.named('''
+          SELECT clock_in, clock_out FROM attendance_corrections
+          WHERE user_id=@i::uuid AND date=@d AND status='approved'
+          ORDER BY submitted_at DESC LIMIT 1
+        '''), parameters: {'i': (u['id'] as Object).toString(), 'd': day});
+        if (corr.isNotEmpty) {
+          final cm = corr.first.toColumnMap();
+          ci = cm['clock_in'] as DateTime;
+          co = cm['clock_out'] as DateTime;
+        }
+        return {'ci': ci, 'co': co, 'cil': cil, 'col': col};
+      });
+      return json({
+        'date': day,
+        'clockIn': (rec['ci'] as DateTime?)?.toIso8601String(),
+        'clockOut': (rec['co'] as DateTime?)?.toIso8601String(),
+        'clockInLocation': rec['cil'],
+        'clockOutLocation': rec['col'],
+      });
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }
@@ -389,9 +428,18 @@ Router attendanceRouter(Db db, Config cfg) {
 
       // Overlay pengajuan milik sendiri sebulan penuh (1 query per jenis):
       // koreksi / lembur / luar-area terbaru per tanggal.
+      // Catatan: JANGAN pakai .map() di atas hasil toColumnMap() bila
+      // sumbernya dynamic — inferensi generic bisa menghasilkan
+      // Map<dynamic,dynamic> dan meledak saat dikembalikan (pernah 500
+      // untuk bulan berjalan). Bangun map bertipe eksplisit.
+      Map<String, dynamic> norm(Map m) {
+        final out = <String, dynamic>{};
+        m.forEach((k, v) => out[k.toString()] = v);
+        return out;
+      }
+
       List<Map<String, dynamic>> rowsOf(dynamic rs) => [
-            for (final row in rs)
-              row.toColumnMap().map((k, v) => MapEntry(k.toString(), v)),
+            for (final row in rs) norm(row.toColumnMap()),
           ];
       final corrRows = rowsOf(await db.pool.runTx((tx) => tx.execute(Sql.named('''
         SELECT * FROM attendance_corrections WHERE user_id=@i::uuid
@@ -500,7 +548,7 @@ Router attendanceRouter(Db db, Config cfg) {
         } else if (co == null) {
           status = isToday ? 'inProgress' : 'incomplete';
         } else {
-          status = isLate(ci.toLocal()) ? 'late' : 'onTime';
+          status = isLate(ci) ? 'late' : 'onTime';
         }
         out.add({
           'date': date.toIso8601String().substring(0, 10),

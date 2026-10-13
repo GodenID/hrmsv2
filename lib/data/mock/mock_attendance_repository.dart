@@ -342,31 +342,66 @@ class MockAttendanceRepository implements AttendanceRepository {
     LeaveRequest? leave,
   ) {
     final r = _currentToday(username);
-    final status = switch (r.status) {
-      AttendanceStatus.notClockedIn =>
-        leave?.status == RequestStatus.approved
-            ? AttendanceDayStatus.leave
-            : WorkCalendar.isWeekend(date)
-            ? AttendanceDayStatus.dayOff
-            : AttendanceDayStatus.notYet,
-      AttendanceStatus.working => AttendanceDayStatus.inProgress,
-      AttendanceStatus.finished =>
-        WorkPolicy.isLate(r.clockIn!)
-            ? AttendanceDayStatus.late
-            : AttendanceDayStatus.onTime,
-    };
+    // Yang disetujui hari ini menimpa catatan (jam input pemohon).
+    DateTime? clockIn = r.clockIn;
+    DateTime? clockOut = r.clockOut;
+    String? inLoc = r.clockInLocation;
+    String? outLoc = r.clockOutLocation;
+    for (final o in store.outOfArea[username] ?? const <OutOfAreaRequest>[]) {
+      if (o.status != RequestStatus.approved) continue;
+      if (!WorkCalendar.isSameDay(o.date, date)) continue;
+      if (o.kind == OutOfAreaKind.clockIn) {
+        clockIn = o.requestedAt;
+        inLoc = inLoc ?? 'Luar area';
+      } else {
+        clockOut = o.requestedAt;
+        outLoc = outLoc ?? 'Luar area';
+      }
+    }
+    final approvedCorr =
+        correction != null && correction.status == RequestStatus.approved
+        ? correction
+        : _approvedCorrection(username, date);
+    if (approvedCorr != null) {
+      clockIn = approvedCorr.clockIn;
+      clockOut = approvedCorr.clockOut;
+    }
+    final status = clockIn == null
+        ? (leave?.status == RequestStatus.approved
+              ? AttendanceDayStatus.leave
+              : WorkCalendar.isWeekend(date)
+              ? AttendanceDayStatus.dayOff
+              : AttendanceDayStatus.notYet)
+        : clockOut == null
+        ? AttendanceDayStatus.inProgress
+        : WorkPolicy.isLate(clockIn)
+        ? AttendanceDayStatus.late
+        : AttendanceDayStatus.onTime;
     return AttendanceDay(
       date: date,
       status: status,
-      clockIn: r.clockIn,
-      clockOut: r.clockOut,
-      clockInLocation: r.clockInLocation,
-      clockOutLocation: r.clockOutLocation,
+      clockIn: clockIn,
+      clockOut: clockOut,
+      clockInLocation: inLoc,
+      clockOutLocation: outLoc,
       leave: leave,
-      correction: correction,
+      correction: correction ?? approvedCorr,
       outOfArea: _latestOutOfArea(username, date),
       overtime: _latestOvertime(username, date),
     );
+  }
+
+  /// Koreksi disetujui terbaru untuk tanggal [date], bila ada.
+  AttendanceCorrection? _approvedCorrection(String username, DateTime date) {
+    AttendanceCorrection? latest;
+    for (final c in store.corrections[username] ?? const <AttendanceCorrection>[]) {
+      if (c.status != RequestStatus.approved) continue;
+      if (!WorkCalendar.isSameDay(c.date, date)) continue;
+      if (latest == null || c.submittedAt.isAfter(latest.submittedAt)) {
+        latest = c;
+      }
+    }
+    return latest;
   }
 
   AttendanceDay _generated(

@@ -25,5 +25,11 @@ DateTime addMonths(DateTime date, int months) {
 /// Jam server dipakai sebagai WIB.
 DateTime nowWib() => DateTime.now().toUtc().add(const Duration(hours: 7));
 
-bool isLate(DateTime clockIn) =>
-    clockIn.hour > 9 || (clockIn.hour == 9 && (clockIn.minute > 0 || clockIn.second > 0));
+/// Terlambat = clock in lewat 09.00 WIB. Selalu konversi ke WIB dulu:
+/// container server berjalan di UTC sehingga .hour langsung / .toLocal()
+/// SALAH (tidak ada yang pernah terlambat).
+bool isLate(DateTime clockIn) {
+  final wib = clockIn.toUtc().add(const Duration(hours: 7));
+  return wib.hour > 9 ||
+      (wib.hour == 9 && (wib.minute > 0 || wib.second > 0));
+}
