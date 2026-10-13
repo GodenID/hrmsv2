@@ -179,20 +179,38 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
                       hintText: 'satu baris per akun: username:password:role\npassword/role boleh kosong (password acak, role default Staff)',
                     ),
                   ),
+                  ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _linesController,
+                    builder: (context, value, _) {
+                      final n = value.text
+                          .split('\n')
+                          .map((e) => e.trim())
+                          .where((e) => e.isNotEmpty)
+                          .length;
+                      if (n == 0) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.xs),
+                        child: Text('Jumlah akun dari daftar: $n'),
+                      );
+                    },
+                  ),
                   const SizedBox(height: AppSpacing.md),
                   TextFormField(
                     controller: _countController,
                     keyboardType: TextInputType.number,
                     inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                     validator: (v) {
+                      if (_linesController.text.trim().isNotEmpty) {
+                        return null;
+                      }
                       final n = int.tryParse((v ?? '').trim());
                       if (n == null || n < 1 || n > 50) {
-                        return 'Isi 1–50.';
+                        return 'Isi 1-50, atau isi daftar akun di atas.';
                       }
                       return null;
                     },
                     decoration: const InputDecoration(
-                      labelText: 'Jumlah akun',
+                      labelText: 'Jumlah akun (jika tanpa daftar)',
                       hintText: 'mis. 10',
                     ),
                   ),
