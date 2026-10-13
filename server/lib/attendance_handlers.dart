@@ -340,16 +340,10 @@ Router attendanceRouter(Db db, Config cfg) {
       final today = dateOnly(nowWib);
       final day = today.toIso8601String().substring(0, 10);
       final rec = await db.pool.runTx((tx) async {
-        final cur = await tx.execute(Sql.named(
-          'SELECT * FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
-        ), parameters: {'i': (u['id'] as Object).toString(), 'd': day});
-        Map<String, dynamic>? m = cur.isEmpty
-            ? null
-            : cur.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         // Sisi efektif: catatan ATAU yang sudah disetujui hari ini.
         final eff = await effectiveSides(
             tx, (u['id'] as Object).toString(), day);
-        if (isIn && m?['clock_in'] != null) throw const _Http(400, 'Anda sudah clock in hari ini.');
+        if (isIn && eff.ci != null) throw const _Http(400, 'Anda sudah clock in hari ini.');
         if (!isIn && eff.ci == null) {
           throw const _Http(400, 'Silakan clock in terlebih dahulu.');
         }
