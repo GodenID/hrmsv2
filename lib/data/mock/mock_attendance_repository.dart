@@ -330,7 +330,18 @@ class MockAttendanceRepository implements AttendanceRepository {
         days.add(_todayEntry(user.username, date, correction, leave));
         continue;
       }
-      if (weekend) continue;
+      if (weekend) {
+        days.add(
+          AttendanceDay(
+            date: date,
+            status: AttendanceDayStatus.dayOff,
+            correction: correction,
+            outOfArea: _latestOutOfArea(user.username, date),
+            overtime: _latestOvertime(user.username, date),
+          ),
+        );
+        continue;
+      }
       if (leaveApproved) {
         days.add(
           AttendanceDay(

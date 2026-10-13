@@ -175,7 +175,8 @@ class _DaySheet extends StatelessWidget {
                   value: correction.reviewerNote!,
                 ),
             ],
-            if (outOfArea != null) ...[
+            if (outOfArea != null &&
+                outOfArea.status == RequestStatus.pending) ...[
               const SizedBox(height: AppSpacing.md),
               const Divider(),
               const SizedBox(height: AppSpacing.md),

@@ -536,8 +536,8 @@ Router attendanceRouter(Db db, Config cfg) {
           }
           continue;
         }
-        if (isWeekend(date)) continue;
-        final lv = leaveOn(date);
+        final weekend = isWeekend(date);
+        final lv = weekend ? null : leaveOn(date);
         final corrLatest = latestOn(corrRows, date);
         final otLatest = latestOn(otRows, date);
         final ooaLatest = latestOn(ooaRows, date);
@@ -581,6 +581,8 @@ Router attendanceRouter(Db db, Config cfg) {
         String status;
         if (approvedLeave) {
           status = 'leave';
+        } else if (weekend && ci == null) {
+          status = 'dayOff';
         } else if (isToday && ci == null) {
           status = 'notYet';
         } else if (ci == null) {
@@ -630,7 +632,6 @@ Router attendanceRouter(Db db, Config cfg) {
       if (today.difference(d).inDays > 30) {
         throw const _Http(422, 'Koreksi maksimal 30 hari ke belakang.');
       }
-      if (isWeekend(d)) throw const _Http(422, 'Akhir pekan tidak perlu dikoreksi.');
       final created = await db.pool.runTx((tx) async {
         final dup = await tx.execute(Sql.named(
           '''SELECT 1 FROM attendance_corrections WHERE user_id=@i::uuid AND date=@d AND status='pending''',

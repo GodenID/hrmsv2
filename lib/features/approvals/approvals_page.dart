@@ -605,8 +605,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         const SizedBox(height: AppSpacing.lg),
          SegmentToggle(
            options: [
-              'Menunggu ()',
-              'Riwayat ()',
+              'Menunggu',
+              'Riwayat',
            ],
            selectedIndex: _historyPane,
            onSelect: (i) => setState(() {

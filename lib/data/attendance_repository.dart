@@ -444,7 +444,6 @@ class AttendanceDay {
     final today = WorkCalendar.dateOnly(now);
     if (!date.isBefore(today)) return false;
     if (leave != null || status == AttendanceDayStatus.leave) return false;
-    if (status == AttendanceDayStatus.dayOff) return false;
     if (today.difference(date).inDays > WorkPolicy.correctionWindowDays) {
       return false;
     }

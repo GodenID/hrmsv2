@@ -30,7 +30,6 @@ class _EventListPageState extends State<EventListPage> {
   final _searchController = TextEditingController();
 
   List<EventItem>? _events;
-  EventThresholds? _thresholds;
   bool _isLoading = false;
   String? _error;
   bool _showPast = false;
@@ -95,14 +94,10 @@ class _EventListPageState extends State<EventListPage> {
       _error = null;
     });
     try {
-      final results = await Future.wait([
-        _repo.fetchEvents(SessionScope.userOf(context)),
-        _repo.fetchThresholds(),
-      ]);
+      final events = await _repo.fetchEvents(SessionScope.userOf(context));
       if (!mounted) return;
       setState(() {
-        _events = results[0] as List<EventItem>;
-        _thresholds = results[1] as EventThresholds;
+        _events = events;
       });
     } on AppException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -196,7 +191,6 @@ class _EventListPageState extends State<EventListPage> {
         if (e.endDate.isBefore(today) && _matches(e, q)) e,
     ];
     final shown = _showPast ? past : upcoming;
-    final t = _thresholds;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -299,15 +293,6 @@ class _EventListPageState extends State<EventListPage> {
               ],
             ),
           ),
-        if (t != null) ...[
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            'Ukuran dari nilai PO: Kecil ${t.rangeLabel(EventSize.small)}  ·  '
-            'Sedang ${t.rangeLabel(EventSize.medium)}  ·  '
-            'Besar ${t.rangeLabel(EventSize.large)}',
-            style: textTheme.bodySmall?.copyWith(fontSize: 12.5, height: 1.5),
-          ),
-        ],
       ],
     );
   }
