@@ -1,7 +1,7 @@
 # Web Prasasti Connect: build Flutter web -> sajikan via nginx.
 # API_BASE_URL dibakar saat build ( Public, bukan rahasia ).
 ARG API_BASE_URL=https://apihrms.prasastigroup.id
-ARG FLUTTER_VERSION=stable
+ARG FLUTTER_VERSION=3.47.7
 
 FROM ghcr.io/cirruslabs/flutter:${FLUTTER_VERSION} AS build
 WORKDIR /app
