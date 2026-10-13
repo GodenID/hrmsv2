@@ -179,8 +179,9 @@ class ApiEmployeeRepository implements EmployeeRepository {
   @override
   Future<List<EmployeeCredential>> createBulk(
     AuthUser actor, {
-    required int count,
-    required UserRole role,
+    int? count,
+    List<BulkAccountSpec>? accounts,
+    UserRole role = UserRole.staff,
     required Division division,
     required EmploymentStatus employmentStatus,
     int? contractMonths,
@@ -189,8 +190,18 @@ class ApiEmployeeRepository implements EmployeeRepository {
       Uri.parse('$_base/employees/bulk'),
       headers: await _h(),
       body: jsonEncode({
-        'count': count,
-        'role': role.name,
+        if (accounts != null)
+          'accounts': [
+            for (final a in accounts)
+              {
+                'username': a.username,
+                if (a.password != null && a.password!.trim().isNotEmpty)
+                  'password': a.password!.trim(),
+                if (a.role != null) 'role': a.role!.name,
+              },
+          ],
+        if (accounts == null) 'count': count,
+        if (accounts == null) 'role': role.name,
         'division': division.name,
         'employmentStatus': employmentStatus.name,
         'contractMonths': contractMonths,

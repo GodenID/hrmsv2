@@ -33,10 +33,14 @@ abstract class EmployeeRepository {
   /// Hanya Super Admin. Password sementara hanya dikembalikan sekali
   /// (untuk dibagikan ke karyawan); akun wajib ganti password + lengkapi
   /// profil saat login pertama.
+  /// Bila [accounts] diisi, membuat akun sesuai daftar baris
+  /// `username:password:role` (password/role opsional). Bila [accounts]
+  /// kosong, memakai [count] akun random.
   Future<List<EmployeeCredential>> createBulk(
     AuthUser actor, {
-    required int count,
-    required UserRole role,
+    int? count,
+    List<BulkAccountSpec>? accounts,
+    UserRole role = UserRole.staff,
     required Division division,
     required EmploymentStatus employmentStatus,
     int? contractMonths,
@@ -196,6 +200,19 @@ class EmployeeCreated {
 
   final EmployeeAccount account;
   final String temporaryPassword;
+}
+
+/// Spesifikasi akun tunggal dalam bulk (username wajib; password/role opsional).
+class BulkAccountSpec {
+  const BulkAccountSpec({
+    required this.username,
+    this.password,
+    this.role,
+  });
+
+  final String username;
+  final String? password;
+  final UserRole? role;
 }
 
 /// Kredensial akun massal (tampilkan SEKALI ke Super Admin untuk dibagikan).

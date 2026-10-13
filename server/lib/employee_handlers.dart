@@ -262,18 +262,12 @@ Router employeeRouter(Db db, Config cfg) {
     try {
       await requireSuperAdmin(req);
       final b = await readJson(req);
-      final count = (b['count'] as num?)?.toInt() ?? 0;
-      final role = ((b['role'] ?? 'staff') as String);
+      final rawAccounts = b['accounts'];
+      final custom = rawAccounts is List;
       final division = ((b['division'] ?? '') as String);
       final status = ((b['employmentStatus'] ?? 'contract') as String);
       final months = (b['contractMonths'] as num?)?.toInt();
-      if (count < 1 || count > 50) {
-        throw const _Http(422, 'Jumlah akun 1–50 per sekali buat.');
-      }
-      if (role != 'staff' && role != 'manager') {
-        // Super Admin tidak dibuat massal (tetap manual satu per satu).
-        throw const _Http(422, 'Role massal hanya Staff atau Manager.');
-      }
+
       if (!divisions.contains(division)) {
         throw const _Http(422, 'Divisi tidak dikenal.');
       }
@@ -284,44 +278,124 @@ Router employeeRouter(Db db, Config cfg) {
           (months == null || months < 1)) {
         throw const _Http(422, 'Isi durasi kontrak/magang dalam bulan.');
       }
+
+      if (custom) {
+        if (rawAccounts.isEmpty || rawAccounts.length > 200) {
+          throw const _Http(422, 'Daftar akun 1-200 baris.');
+        }
+        final seen = <String>{};
+        for (final raw in rawAccounts) {
+          final m = (raw as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ??
+              const <String, dynamic>{};
+          final username =
+              ((m['username'] ?? '') as Object).toString().trim().toLowerCase();
+          final uerr = validateUsername(username);
+          if (uerr != null) {
+            throw _Http(422, '$uerr (baris: ${m['username']})');
+          }
+          if (!seen.add(username)) {
+            throw _Http(409, 'Username "$username" duplikat dalam daftar.');
+          }
+          final role = ((m['role'] ?? 'staff') as Object).toString().trim().toLowerCase();
+          if (role != 'staff' && role != 'manager') {
+            throw _Http(422, 'Role "$role" tidak valid (Staff/Manager).');
+          }
+          final pw = ((m['password'] ?? '') as Object).toString();
+          if (pw.isNotEmpty && !passwordOk(pw, username)) {
+            throw _Http(422,
+                'Password untuk "$username" belum memenuhi ketentuan.');
+          }
+        }
+      } else {
+        final count = (b['count'] as num?)?.toInt() ?? 0;
+        if (count < 1 || count > 50) {
+          throw const _Http(422, 'Jumlah akun 1-50 per sekali buat.');
+        }
+        final role = ((b['role'] ?? 'staff') as String).trim().toLowerCase();
+        if (role != 'staff' && role != 'manager') {
+          throw const _Http(422, 'Role massal hanya Staff atau Manager.');
+        }
+      }
+
       final r = Random.secure();
       final created = await db.pool.runTx((tx) async {
         final out = <Map<String, dynamic>>[];
-        for (var i = 0; i < count; i++) {
-          var name = '';
-          for (var attempt = 0; attempt < 20; attempt++) {
-            final cand = randomUsername(r);
+        if (custom) {
+          for (final raw in rawAccounts) {
+            final m = (raw as Map?)?.map((k, v) => MapEntry(k.toString(), v)) ??
+                const <String, dynamic>{};
+            final username =
+                ((m['username'] ?? '') as Object).toString().trim().toLowerCase();
+            final role =
+                ((m['role'] ?? 'staff') as Object).toString().trim().toLowerCase();
+            final provided = ((m['password'] ?? '') as Object).toString();
+            final password = provided.trim().isEmpty ? tempPassword() : provided;
+
             final exists = await tx.execute(
               Sql.named('SELECT 1 FROM users WHERE username=@u'),
-              parameters: {'u': cand},
+              parameters: {'u': username},
             );
-            if (exists.isEmpty) {
-              name = cand;
-              break;
+            if (exists.isNotEmpty) {
+              throw _Http(409, 'Username "$username" sudah dipakai.');
             }
+            final eid = await nextEmployeeId(tx);
+            await tx.execute(Sql.named('''
+              INSERT INTO users(username, full_name, role, employee_id, position,
+                division, employment_status, contract_months, join_date,
+                password_hash, must_change_password, profile_complete)
+              VALUES(@u,'Karyawan Baru',@role,@eid,'Staf',@div,@es,@cm,@jd,
+                @pw,TRUE,FALSE)
+            '''), parameters: {
+              'u': username,
+              'role': role,
+              'eid': eid,
+              'div': division,
+              'es': status,
+              'cm': (status == 'contract' || status == 'internship') ? months : null,
+              'jd': DateTime.now().toUtc().toIso8601String().substring(0, 10),
+              'pw': BCrypt.hashpw(password, BCrypt.gensalt()),
+            });
+            out.add({'username': username, 'temporaryPassword': password});
           }
-          if (name.isEmpty) {
-            throw const _Http(500, 'Gagal membuat username unik. Coba lagi.');
+        } else {
+          final count = (b['count'] as num).toInt();
+          final role = ((b['role'] ?? 'staff') as String).trim().toLowerCase();
+          for (var i = 0; i < count; i++) {
+            var name = '';
+            for (var attempt = 0; attempt < 20; attempt++) {
+              final cand = randomUsername(r);
+              final exists = await tx.execute(
+                Sql.named('SELECT 1 FROM users WHERE username=@u'),
+                parameters: {'u': cand},
+              );
+              if (exists.isEmpty) {
+                name = cand;
+                break;
+              }
+            }
+            if (name.isEmpty) {
+              throw const _Http(500, 'Gagal membuat username unik. Coba lagi.');
+            }
+            final password = tempPassword();
+            final eid = await nextEmployeeId(tx);
+            await tx.execute(Sql.named('''
+              INSERT INTO users(username, full_name, role, employee_id, position,
+                division, employment_status, contract_months, join_date,
+                password_hash, must_change_password, profile_complete)
+              VALUES(@u,'Karyawan Baru',@role,@eid,'Staf',@div,@es,@cm,@jd,
+                @pw,TRUE,FALSE)
+            '''), parameters: {
+              'u': name,
+              'role': role,
+              'eid': eid,
+              'div': division,
+              'es': status,
+              'cm': (status == 'contract' || status == 'internship') ? months : null,
+              'jd': DateTime.now().toUtc().toIso8601String().substring(0, 10),
+              'pw': BCrypt.hashpw(password, BCrypt.gensalt()),
+            });
+            out.add({'username': name, 'temporaryPassword': password});
           }
-          final password = tempPassword();
-          final eid = await nextEmployeeId(tx);
-          await tx.execute(Sql.named('''
-            INSERT INTO users(username, full_name, role, employee_id, position,
-              division, employment_status, contract_months, join_date,
-              password_hash, must_change_password, profile_complete)
-            VALUES(@u,'Karyawan Baru',@role,@eid,'Staf',@div,@es,@cm,@jd,
-              @pw,TRUE,FALSE)
-          '''), parameters: {
-            'u': name,
-            'role': role,
-            'eid': eid,
-            'div': division,
-            'es': status,
-            'cm': (status == 'contract' || status == 'internship') ? months : null,
-            'jd': DateTime.now().toUtc().toIso8601String().substring(0, 10),
-            'pw': BCrypt.hashpw(password, BCrypt.gensalt()),
-          });
-          out.add({'username': name, 'temporaryPassword': password});
         }
         return out;
       });

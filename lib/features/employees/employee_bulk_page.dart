@@ -26,6 +26,7 @@ class EmployeeBulkPage extends StatefulWidget {
 class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
   final _formKey = GlobalKey<FormState>();
   final _countController = TextEditingController(text: '5');
+  final _linesController = TextEditingController();
 
   UserRole _role = UserRole.staff;
   Division _division = Division.produksiPrasasti;
@@ -39,6 +40,7 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
   @override
   void dispose() {
     _countController.dispose();
+    _linesController.dispose();
     _monthsController.dispose();
     super.dispose();
   }
@@ -53,9 +55,18 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
       _result = null;
     });
     try {
+      final rawLines = _linesController.text
+          .split('\\n')
+          .map((s) => s.trim())
+          .where((s) => s.isNotEmpty)
+          .toList();
+      final accounts = _parseLines(rawLines);
       final created = await AppScope.of(context).employees.createBulk(
             SessionScope.userOf(context),
-            count: int.parse(_countController.text.trim()),
+            accounts: accounts.isEmpty ? null : accounts,
+            count: accounts.isEmpty
+                ? int.parse(_countController.text.trim())
+                : null,
             role: _role,
             division: _division,
             employmentStatus: _status,
@@ -70,7 +81,7 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
         context,
         title: 'Akun dibuat',
         message:
-            '${created.length} akun ${_role.label} dibuat. Bagikan username '
+            '${created.length} akun dibuat. Bagikan username '
             '& password di bawah — hanya tampil sekali di sini.',
       );
     } on AppException catch (e) {
@@ -80,6 +91,48 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  List<BulkAccountSpec> _parseLines(List<String> rawLines) {
+    final out = <BulkAccountSpec>[];
+    for (final line in rawLines) {
+      final parts = line.split(':');
+      final username = parts.isNotEmpty ? parts.first.trim() : '';
+      String? password;
+      UserRole? role;
+      if (parts.length == 1) {
+        password = null;
+        role = null;
+      } else if (parts.length == 2) {
+        final second = parts[1].trim();
+        if (second.toLowerCase() == 'staff' ||
+            second.toLowerCase() == 'manager') {
+          role = second.toLowerCase() == 'staff'
+              ? UserRole.staff
+              : UserRole.manager;
+          password = null;
+        } else {
+          password = second.isEmpty ? null : second;
+          role = null;
+        }
+      } else {
+        password = parts[1].trim().isEmpty ? null : parts[1].trim();
+        final r = parts[2].trim().toLowerCase();
+        role = r.isEmpty
+            ? null
+            : (r == 'staff'
+                ? UserRole.staff
+                : (r == 'manager' ? UserRole.manager : null));
+      }
+      out.add(
+        BulkAccountSpec(
+          username: username,
+          password: password,
+          role: role,
+        ),
+      );
+    }
+    return out;
   }
 
   Future<void> _copyAll() async {
@@ -117,6 +170,16 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  TextFormField(
+                    controller: _linesController,
+                    minLines: 4,
+                    maxLines: 12,
+                    decoration: const InputDecoration(
+                      labelText: 'Daftar akun (opsional)',
+                      hintText: 'satu baris per akun: username:password:role\npassword/role boleh kosong (password acak, role default Staff)',
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
                   TextFormField(
                     controller: _countController,
                     keyboardType: TextInputType.number,

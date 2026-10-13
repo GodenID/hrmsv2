@@ -309,54 +309,132 @@ class MockEmployeeRepository implements EmployeeRepository {
   @override
   Future<List<EmployeeCredential>> createBulk(
     AuthUser actor, {
-    required int count,
-    required UserRole role,
+    int? count,
+    List<BulkAccountSpec>? accounts,
+    UserRole role = UserRole.staff,
     required Division division,
     required EmploymentStatus employmentStatus,
     int? contractMonths,
   }) async {
     await Future<void>.delayed(latency);
     _requireSuperAdmin(actor);
-    if (count < 1 || count > 50) {
-      throw const AppException('Jumlah akun 1–50 per sekali buat.');
-    }
-    if (role != UserRole.staff && role != UserRole.manager) {
-      throw const AppException('Role massal hanya Staff atau Manager.');
+    if (accounts != null) {
+      if (accounts.isEmpty || accounts.length > 200) {
+        throw const AppException('Daftar akun 1-200 baris.');
+      }
+      final seen = <String>{};
+      for (final a in accounts) {
+        final name = a.username.trim().toLowerCase();
+        _check(EmployeeRules.validateUsername(name));
+        if (!seen.add(name)) {
+          throw AppException('Username "$name" duplikat dalam daftar.');
+        }
+        if (store.account(name) != null) {
+          throw AppException(
+            'Username "$name" sudah dipakai (termasuk akun nonaktif).',
+          );
+        }
+        final r = a.role ?? role;
+        if (r != UserRole.staff && r != UserRole.manager) {
+          throw const AppException('Role hanya Staff atau Manager.');
+        }
+        if (a.password != null &&
+            a.password!.trim().isNotEmpty &&
+            !_passwordOk(name, a.password!.trim())) {
+          throw AppException(
+            'Password akun "$name" belum memenuhi ketentuan.',
+          );
+        }
+      }
+    } else {
+      final c = count ?? 0;
+      if (c < 1 || c > 50) {
+        throw const AppException('Jumlah akun 1-50 per sekali buat.');
+      }
+      if (role != UserRole.staff && role != UserRole.manager) {
+        throw const AppException('Role massal hanya Staff atau Manager.');
+      }
     }
     if (employmentStatus.requiresDuration &&
         (contractMonths == null || contractMonths < 1)) {
       throw const AppException('Isi durasi kontrak/magang dalam bulan.');
     }
+
     final out = <EmployeeCredential>[];
-    for (var i = 0; i < count; i++) {
-      final username = _randomUsername();
-      final password = _temporaryPassword();
-      final account = MockAccount(
-        username: username,
-        fullName: 'Karyawan Baru',
-        role: role,
-        nik: '',
-        employeeId: store.nextEmployeeId(),
-        position: 'Staf',
-        division: division,
-        employmentStatus: employmentStatus,
-        contractMonths: employmentStatus.requiresDuration
-            ? contractMonths
-            : null,
-        joinDate: WorkCalendar.dateOnly(store.now()),
-        email: '',
-        phone: '',
-        password: password,
-      );
-      account.mustChangePassword = true;
-      account.profileComplete = false;
-      store.accounts[username] = account;
-      out.add(
-        EmployeeCredential(username: username, temporaryPassword: password),
-      );
+    if (accounts != null) {
+      for (final a in accounts) {
+        final username = a.username.trim().toLowerCase();
+        final r = a.role ?? role;
+        final password = (a.password == null || a.password!.trim().isEmpty)
+            ? _temporaryPassword()
+            : a.password!.trim();
+        final account = MockAccount(
+          username: username,
+          fullName: 'Karyawan Baru',
+          role: r,
+          nik: '',
+          employeeId: store.nextEmployeeId(),
+          position: 'Staf',
+          division: division,
+          employmentStatus: employmentStatus,
+          contractMonths: employmentStatus.requiresDuration
+              ? contractMonths
+              : null,
+          joinDate: WorkCalendar.dateOnly(store.now()),
+          email: '',
+          phone: '',
+          password: password,
+        );
+        account.mustChangePassword = true;
+        account.profileComplete = false;
+        store.accounts[username] = account;
+        out.add(
+          EmployeeCredential(username: username, temporaryPassword: password),
+        );
+      }
+    } else {
+      final c = count ?? 0;
+      for (var i = 0; i < c; i++) {
+        final username = _randomUsername();
+        final password = _temporaryPassword();
+        final account = MockAccount(
+          username: username,
+          fullName: 'Karyawan Baru',
+          role: role,
+          nik: '',
+          employeeId: store.nextEmployeeId(),
+          position: 'Staf',
+          division: division,
+          employmentStatus: employmentStatus,
+          contractMonths: employmentStatus.requiresDuration
+              ? contractMonths
+              : null,
+          joinDate: WorkCalendar.dateOnly(store.now()),
+          email: '',
+          phone: '',
+          password: password,
+        );
+        account.mustChangePassword = true;
+        account.profileComplete = false;
+        store.accounts[username] = account;
+        out.add(
+          EmployeeCredential(username: username, temporaryPassword: password),
+        );
+      }
     }
     store.employeeChanges.ping();
     return List.unmodifiable(out);
+  }
+
+  bool _passwordOk(String username, String password) {
+    if (password.length < 8) return false;
+    if (!RegExp(r'[A-Z]').hasMatch(password)) return false;
+    if (!RegExp(r'[a-z]').hasMatch(password)) return false;
+    if (!RegExp(r'\d').hasMatch(password)) return false;
+    if (username.length >= 3 && password.toLowerCase().contains(username)) {
+      return false;
+    }
+    return true;
   }
 
   String _randomUsername() {
