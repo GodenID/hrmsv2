@@ -134,17 +134,26 @@ class AttendanceCalendar extends StatelessWidget {
     final look = loading
         ? const CalendarLook(tone: CalendarTone.upcoming)
         : calendarLookFor(day, date: date, today: today);
-    // Tanggal yang sudah lewat (dan hari ini) bisa diketuk — termasuk akhir
-    // pekan/libur — untuk melihat catatan atau mengajukan absensi bila lupa.
+    // Semua tanggal sampai hari ini bisa diketuk — termasuk akhir pekan/libur
+    // dan tanggal yang tidak ada datanya dari server (mis. sebelum akun
+    // dibuat) — untuk melihat catatan atau mengajukan absensi bila lupa.
     // Tanggal mendatang tidak bisa diketuk.
     final tappable =
-        !loading && day != null && !WorkCalendar.dateOnly(date).isAfter(today);
+        !loading && !WorkCalendar.dateOnly(date).isAfter(WorkCalendar.dateOnly(today));
+    final target =
+        day ??
+        AttendanceDay(
+          date: date,
+          status: WorkCalendar.isWeekend(date)
+              ? AttendanceDayStatus.dayOff
+              : AttendanceDayStatus.absent,
+        );
     return _DayCell(
       date: date,
       look: look,
       isToday: WorkCalendar.isSameDay(date, today),
       detailed: detailed,
-      onTap: tappable ? () => onTapDay(day) : null,
+      onTap: tappable ? () => onTapDay(target) : null,
     );
   }
 }
