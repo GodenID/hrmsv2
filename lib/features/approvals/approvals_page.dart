@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
+import '../../core/push_notifications.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_colors.dart';
@@ -62,6 +63,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     _leave.changes.addListener(_onChanged);
     _attendance.changes.addListener(_onChanged);
     _overtime.changes.addListener(_onChanged);
+    AppRefresh.leave.addListener(_onChanged);
+    AppRefresh.attendance.addListener(_onChanged);
+    AppRefresh.overtime.addListener(_onChanged);
     _searchController.addListener(() => setState(() {}));
     _load();
   }
@@ -71,6 +75,9 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     _leave.changes.removeListener(_onChanged);
     _attendance.changes.removeListener(_onChanged);
     _overtime.changes.removeListener(_onChanged);
+    AppRefresh.leave.removeListener(_onChanged);
+    AppRefresh.attendance.removeListener(_onChanged);
+    AppRefresh.overtime.removeListener(_onChanged);
     _searchController.dispose();
     super.dispose();
   }

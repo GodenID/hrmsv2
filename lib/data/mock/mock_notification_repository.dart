@@ -149,4 +149,47 @@ class MockNotificationRepository implements NotificationRepository {
     list.clear();
     store.notificationChanges.ping();
   }
+
+  @override
+  Future<int> broadcast(
+    AuthUser actor, {
+    required String title,
+    required String body,
+    required BroadcastAudience audience,
+  }) async {
+    await Future<void>.delayed(latency);
+    if (actor.role != UserRole.superadmin) {
+      throw const PermissionDeniedException(
+        'Hanya Super Admin yang dapat mengirim siaran.',
+      );
+    }
+    if (title.trim().length < 3) {
+      throw const AppException('Judul siaran minimal 3 karakter.');
+    }
+    if (body.trim().isEmpty) {
+      throw const AppException('Isi siaran wajib diisi.');
+    }
+    var sent = 0;
+    final sorted = [...store.accounts.values]
+      ..sort((a, b) => a.fullName.compareTo(b.fullName));
+    for (final a in sorted) {
+      if (!a.active || a.username == actor.username) continue;
+      if (audience == BroadcastAudience.staff && a.role != UserRole.staff) {
+        continue;
+      }
+      if (audience == BroadcastAudience.managers &&
+          a.role != UserRole.manager &&
+          a.role != UserRole.superadmin) {
+        continue;
+      }
+      store.notify(
+        a.username,
+        kind: NotificationKind.announcement,
+        title: title.trim(),
+        body: body.trim(),
+      );
+      sent++;
+    }
+    return sent;
+  }
 }

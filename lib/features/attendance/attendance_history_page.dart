@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
+import '../../core/push_notifications.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_colors.dart';
 import '../../core/utils/date_format_id.dart';
@@ -53,6 +54,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
     // Pengajuan cuti / izin / sakit juga mengubah warna kalender.
     _changes = Listenable.merge([deps.attendance.changes, deps.leave.changes]);
     _changes.addListener(_onChanged);
+    AppRefresh.attendance.addListener(_onChanged);
     _periodStart = WorkCalendar.periodStartFor(DateTime.now());
     _loadFirstPeriod();
     _load();
@@ -61,6 +63,7 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
   @override
   void dispose() {
     _changes.removeListener(_onChanged);
+    AppRefresh.attendance.removeListener(_onChanged);
     super.dispose();
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
+import '../../../core/push_notifications.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/theme_colors.dart';
 import '../../../core/utils/date_format_id.dart';
@@ -45,13 +46,19 @@ class _AnnouncementCarouselState extends State<AnnouncementCarousel> {
   @override
   void initState() {
     super.initState();
+    AppRefresh.announcements.addListener(_reload);
     _load();
   }
 
   @override
   void dispose() {
+    AppRefresh.announcements.removeListener(_reload);
     _controller?.dispose();
     super.dispose();
+  }
+
+  void _reload() {
+    if (mounted) _load();
   }
 
   /// viewportFraction tidak bisa diubah setelah dibuat, jadi controller

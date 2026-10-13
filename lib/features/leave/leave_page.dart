@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
+import '../../core/push_notifications.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_colors.dart';
@@ -46,6 +47,8 @@ class _LeavePageState extends State<LeavePage> {
     _overtimeRepo = AppScope.of(context).overtime;
     _repo.changes.addListener(_onChanged);
     _overtimeRepo.changes.addListener(_onChanged);
+    AppRefresh.leave.addListener(_onChanged);
+    AppRefresh.overtime.addListener(_onChanged);
     _searchController.addListener(() => setState(() {}));
     _load();
   }
@@ -54,6 +57,8 @@ class _LeavePageState extends State<LeavePage> {
   void dispose() {
     _repo.changes.removeListener(_onChanged);
     _overtimeRepo.changes.removeListener(_onChanged);
+    AppRefresh.leave.removeListener(_onChanged);
+    AppRefresh.overtime.removeListener(_onChanged);
     _searchController.dispose();
     super.dispose();
   }

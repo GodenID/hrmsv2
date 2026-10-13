@@ -142,4 +142,35 @@ class ApiNotificationRepository implements NotificationRepository {
     } catch (_) {}
     _ping();
   }
+
+  @override
+  Future<int> broadcast(
+    AuthUser actor, {
+    required String title,
+    required String body,
+    required BroadcastAudience audience,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/notifications/broadcast'),
+      headers: await _h(),
+      body: jsonEncode({
+        'title': title,
+        'body': body,
+        'audience': audience.name,
+      }),
+    );
+    if (res.statusCode != 200) {
+      String msg = 'Gagal mengirim siaran.';
+      try {
+        final m = jsonDecode(res.body);
+        if (m is Map && m['message'] != null) msg = m['message'].toString();
+      } catch (_) {}
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        throw PermissionDeniedException(msg);
+      }
+      throw AppException(msg);
+    }
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    return (m['sent'] as num?)?.toInt() ?? 0;
+  }
 }

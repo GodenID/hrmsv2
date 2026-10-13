@@ -45,9 +45,9 @@ abstract final class PushNotifications {
         } catch (_) {}
       });
       // Foreground: sistem tidak menampilkan banner; tampilkan snackbar
-      // + segarkan panel absensi (jam yang baru disetujui langsung tampil).
+      // + segarkan semua tampilan terkait (realtime tanpa refresh manual).
       FirebaseMessaging.onMessage.listen((m) {
-        AppRefresh.pingAttendance();
+        AppRefresh.pingForKind((m.data['kind'] ?? '').toString());
         final title =
             m.notification?.title ?? m.data['title'] ?? 'Notifikasi baru';
         final body = m.notification?.body ?? m.data['body'] ?? '';
@@ -109,8 +109,60 @@ abstract final class PushNotifications {
 }
 
 /// Pemicu muat-ulang lintas halaman (mis. push masuk saat aplikasi terbuka).
+/// Halaman berlangganan bus domainnya; push memicu bus yang sesuai agar
+/// semua yang tampil terganti otomatis tanpa refresh manual.
 abstract final class AppRefresh {
   static final attendance = ValueNotifier<int>(0);
+  static final leave = ValueNotifier<int>(0);
+  static final overtime = ValueNotifier<int>(0);
+  static final employees = ValueNotifier<int>(0);
+  static final announcements = ValueNotifier<int>(0);
+  static final events = ValueNotifier<int>(0);
+  static final warnings = ValueNotifier<int>(0);
+  static final notifications = ValueNotifier<int>(0);
 
   static void pingAttendance() => attendance.value++;
+  static void pingLeave() => leave.value++;
+  static void pingOvertime() => overtime.value++;
+  static void pingEmployees() => employees.value++;
+  static void pingAnnouncements() => announcements.value++;
+  static void pingEvents() => events.value++;
+  static void pingWarnings() => warnings.value++;
+  static void pingNotifications() => notifications.value++;
+
+  /// Pemicu dari jenis notifikasi push. Selalu + lonceng.
+  static void pingForKind(String kind) {
+    switch (kind) {
+      case 'leaveApproved':
+      case 'leaveRejected':
+      case 'collectiveLeaveApplied':
+        pingLeave();
+      case 'correctionApproved':
+      case 'correctionRejected':
+      case 'outOfAreaApproved':
+      case 'outOfAreaRejected':
+        pingAttendance();
+      case 'overtimeApproved':
+      case 'overtimeRejected':
+        pingOvertime();
+        pingLeave();
+      case 'reviewRequested':
+        pingAttendance();
+        pingLeave();
+        pingOvertime();
+      case 'announcement':
+        pingAnnouncements();
+      case 'eventCancelled':
+      case 'eventToday':
+        pingEvents();
+      case 'accountRegistered':
+      case 'contractExpiring':
+      case 'contractExpired':
+        pingEmployees();
+      case 'warningIssued':
+      case 'warningExpiring':
+        pingWarnings();
+    }
+    pingNotifications();
+  }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
+import '../../core/push_notifications.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_colors.dart';
 import '../../core/utils/currency_format.dart';
@@ -44,6 +45,7 @@ class _EventListPageState extends State<EventListPage> {
     _initialized = true;
     _repo = AppScope.of(context).events;
     _repo.changes.addListener(_onChanged);
+    AppRefresh.events.addListener(_onChanged);
     _searchController.addListener(() => setState(() {}));
     final now = DateTime.now();
     _month = DateTime(now.year, now.month);
@@ -68,6 +70,7 @@ class _EventListPageState extends State<EventListPage> {
   @override
   void dispose() {
     _repo.changes.removeListener(_onChanged);
+    AppRefresh.events.removeListener(_onChanged);
     _searchController.dispose();
     super.dispose();
   }

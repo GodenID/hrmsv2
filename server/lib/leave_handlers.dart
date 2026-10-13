@@ -857,6 +857,60 @@ Router notificationRouter(Db db, Config cfg) {
     }
   });
 
+  // ---------- siaran superadmin: judul + isi bebas ----------
+  r.post('/notifications/broadcast', (Request req) async {
+    try {
+      final actor = await me(req);
+      if (actor['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat mengirim siaran.');
+      }
+      final b = await readJson(req);
+      final title = ((b['title'] ?? '') as String).trim();
+      final body = ((b['body'] ?? '') as String).trim();
+      final audience = ((b['audience'] ?? 'all') as String);
+      if (title.length < 3) {
+        throw const _Http(422, 'Judul siaran minimal 3 karakter.');
+      }
+      if (title.length > 120) {
+        throw const _Http(422, 'Judul siaran maksimal 120 karakter.');
+      }
+      if (body.isEmpty) {
+        throw const _Http(422, 'Isi siaran wajib diisi.');
+      }
+      if (body.length > 500) {
+        throw const _Http(422, 'Isi siaran maksimal 500 karakter.');
+      }
+      if (audience != 'all' && audience != 'staff' && audience != 'managers') {
+        throw const _Http(422, 'Sasaran siaran tidak dikenal.');
+      }
+      final sent = await db.pool.runTx((tx) async {
+        final rs = await tx.execute(Sql.named('''
+          SELECT username, role FROM users
+          WHERE active AND username<>@me ORDER BY full_name
+        '''), parameters: {'me': actor['username']});
+        var n = 0;
+        for (final row in rs) {
+          final m = row.toColumnMap();
+          final role = (m['role'] ?? 'staff') as String;
+          if (audience == 'staff' && role != 'staff') continue;
+          if (audience == 'managers' && role != 'manager' && role != 'superadmin') {
+            continue;
+          }
+          await notifyTx(tx, m['username'] as String,
+              kind: 'announcement', title: title, body: body);
+          n++;
+        }
+        return n;
+      });
+      if (sent == 0) {
+        return json({'message': 'Tidak ada penerima yang cocok.'}, status: 422);
+      }
+      return json({'sent': sent});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
   // ---------- token push per perangkat ----------
   r.post('/users/me/push-tokens', (Request req) async {
     try {

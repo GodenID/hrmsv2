@@ -14,6 +14,7 @@ import '../dashboard/dashboard_page.dart';
 import '../employees/employee_list_page.dart';
 import '../events/event_list_page.dart';
 import '../leave/leave_page.dart';
+import '../notifications/broadcast_page.dart';
 import '../reports/reports_page.dart';
 import '../warnings/warnings_page.dart';
 import '../notifications/widgets/notification_bell.dart';
@@ -120,6 +121,16 @@ List<_Destination> _destinationsFor(UserRole role) {
         icon: Icons.assessment_outlined,
         selectedIcon: Icons.assessment,
         builder: (_) => const ReportsPage(),
+        section: _Section.manage,
+        primaryOnMobile: false,
+      ),
+    if (role == UserRole.superadmin)
+      _Destination(
+        tab: ShellTab.broadcast,
+        label: 'Siaran',
+        icon: Icons.campaign_outlined,
+        selectedIcon: Icons.campaign,
+        builder: (_) => const BroadcastPage(),
         section: _Section.manage,
         primaryOnMobile: false,
       ),

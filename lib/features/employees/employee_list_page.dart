@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
+import '../../core/push_notifications.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_colors.dart';
 import '../../core/widgets/initials_avatar.dart';
@@ -45,6 +46,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     _initialized = true;
     _repo = AppScope.of(context).employees;
     _repo.changes.addListener(_onChanged);
+    AppRefresh.employees.addListener(_onChanged);
     _searchController.addListener(() => setState(() {}));
     _load();
   }
@@ -52,6 +54,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
   @override
   void dispose() {
     _repo.changes.removeListener(_onChanged);
+    AppRefresh.employees.removeListener(_onChanged);
     _searchController.dispose();
     super.dispose();
   }

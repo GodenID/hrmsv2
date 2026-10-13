@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/push_notifications.dart';
 import '../../../core/theme/theme_colors.dart';
 import '../../../core/utils/date_format_id.dart';
 import '../../../core/utils/work_calendar.dart';
@@ -99,6 +100,8 @@ class _SummarySectionState extends State<SummarySection> {
     widget.attendance.changes.addListener(_reload);
     widget.leave.changes.addListener(_reload);
     widget.events.changes.addListener(_reload);
+    AppRefresh.leave.addListener(_reload);
+    AppRefresh.attendance.addListener(_reload);
   }
 
   @override
@@ -106,6 +109,8 @@ class _SummarySectionState extends State<SummarySection> {
     widget.attendance.changes.removeListener(_reload);
     widget.leave.changes.removeListener(_reload);
     widget.events.changes.removeListener(_reload);
+    AppRefresh.leave.removeListener(_reload);
+    AppRefresh.attendance.removeListener(_reload);
     super.dispose();
   }
 

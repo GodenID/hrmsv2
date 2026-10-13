@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
+import '../../core/push_notifications.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_colors.dart';
 import '../../core/utils/date_format_id.dart';
@@ -40,6 +41,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
     _initialized = true;
     _repo = AppScope.of(context).notifications;
     _repo.changes.addListener(_onChanged);
+    AppRefresh.notifications.addListener(_onChanged);
     _searchController.addListener(() => setState(() {}));
     _load();
   }
@@ -47,6 +49,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
   @override
   void dispose() {
     _repo.changes.removeListener(_onChanged);
+    AppRefresh.notifications.removeListener(_onChanged);
     _searchController.dispose();
     super.dispose();
   }

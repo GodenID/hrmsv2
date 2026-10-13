@@ -26,6 +26,26 @@ abstract class NotificationRepository {
 
   /// Menghapus semua notifikasi milik [user] (permanen).
   Future<void> clearAll(AuthUser user);
+
+  /// Siaran Super Admin: judul + isi bebas ke [audience].
+  /// Mengembalikan jumlah penerima. Non-Super Admin ditolak server.
+  Future<int> broadcast(
+    AuthUser actor, {
+    required String title,
+    required String body,
+    required BroadcastAudience audience,
+  });
+}
+
+/// Sasaran siaran Super Admin.
+enum BroadcastAudience {
+  all('Semua karyawan'),
+  staff('Staff saja'),
+  managers('Manager & Super Admin');
+
+  const BroadcastAudience(this.label);
+
+  final String label;
 }
 
 enum NotificationKind {

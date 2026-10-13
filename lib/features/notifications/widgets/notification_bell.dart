@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/app_scope.dart';
+import '../../../core/push_notifications.dart';
 import '../../../core/theme/theme_colors.dart';
 import '../../../data/notification_repository.dart';
 import '../../shell/shell_controller.dart';
@@ -26,12 +27,14 @@ class _NotificationBellState extends State<NotificationBell> {
     _initialized = true;
     _repo = AppScope.of(context).notifications;
     _repo.changes.addListener(_load);
+    AppRefresh.notifications.addListener(_load);
     _load();
   }
 
   @override
   void dispose() {
     _repo.changes.removeListener(_load);
+    AppRefresh.notifications.removeListener(_load);
     super.dispose();
   }
 
