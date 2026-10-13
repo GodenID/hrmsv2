@@ -44,6 +44,10 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   String? _error;
   int _tab = 0;
   int _requestId = 0;
+  int _historyPane = 0;
+  int _historyLimit = 20;
+  DateTime? _historyFrom;
+  DateTime? _historyTo;
   final _searchController = TextEditingController();
 
   /// Mode pilih banyak (khusus Super Admin) + id yang dipilih.
@@ -67,6 +71,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     AppRefresh.attendance.addListener(_onChanged);
     AppRefresh.overtime.addListener(_onChanged);
     _searchController.addListener(() => setState(() {}));
+    _historyFrom ??= DateTime.now().subtract(const Duration(days: 30));
+    _historyTo ??= DateTime.now();
     _load();
   }
 
@@ -88,6 +94,30 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   bool _matchesName(String fullName, String q) {
     if (q.isEmpty) return true;
     return fullName.toLowerCase().contains(q);
+  }
+
+  bool _inHistoryRange(DateTime at) {
+    final d = at.toLocal();
+    if (_historyFrom != null) {
+      final from = DateTime(
+        _historyFrom!.year,
+        _historyFrom!.month,
+        _historyFrom!.day,
+      );
+      if (d.isBefore(from)) return false;
+    }
+    if (_historyTo != null) {
+      final to = DateTime(
+        _historyTo!.year,
+        _historyTo!.month,
+        _historyTo!.day,
+        23,
+        59,
+        59,
+      );
+      if (d.isAfter(to)) return false;
+    }
+    return true;
   }
 
   void _onChanged() {
@@ -321,8 +351,10 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     );
   }
 
-  String get _query => _searchController.text.trim().toLowerCase();
+  List<T> _paged<T>(List<T> items) =>
+      items.length <= _historyLimit ? items : items.take(_historyLimit).toList();
 
+  String get _query => _searchController.text.trim().toLowerCase();
   List<LeaveReviewItem> get _leavePending => [
     for (final i in _leaveItems ?? const <LeaveReviewItem>[])
       if (i.request.status == RequestStatus.pending &&
@@ -333,7 +365,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   List<LeaveReviewItem> get _leaveDone => [
     for (final i in _leaveItems ?? const <LeaveReviewItem>[])
       if (i.request.status != RequestStatus.pending &&
-          _matchesName(i.employee.fullName, _query))
+          _matchesName(i.employee.fullName, _query) &&
+          _inHistoryRange(i.request.submittedAt))
         i,
   ];
 
@@ -347,7 +380,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   List<CorrectionReviewItem> get _corrDone => [
     for (final i in _correctionItems ?? const <CorrectionReviewItem>[])
       if (i.correction.status != RequestStatus.pending &&
-          _matchesName(i.employee.fullName, _query))
+          _matchesName(i.employee.fullName, _query) &&
+          _inHistoryRange(i.correction.submittedAt))
         i,
   ];
 
@@ -361,7 +395,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   List<OutOfAreaReviewItem> get _oaDone => [
     for (final i in _outOfAreaItems ?? const <OutOfAreaReviewItem>[])
       if (i.request.status != RequestStatus.pending &&
-          _matchesName(i.employee.fullName, _query))
+          _matchesName(i.employee.fullName, _query) &&
+          _inHistoryRange(i.request.submittedAt))
         i,
   ];
 
@@ -375,10 +410,24 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
   List<OvertimeReviewItem> get _otDone => [
     for (final i in _overtimeItems ?? const <OvertimeReviewItem>[])
       if (i.request.status != RequestStatus.pending &&
-          _matchesName(i.employee.fullName, _query))
+          _matchesName(i.employee.fullName, _query) &&
+          _inHistoryRange(i.request.submittedAt))
         i,
   ];
 
+  int get _activePendingCount => switch (_tab) {
+    0 => _leavePending.length,
+    1 => _corrPending.length,
+    2 => _oaPending.length,
+    _ => _otPending.length,
+  };
+
+  int get _activeDoneCount => switch (_tab) {
+    0 => _leaveDone.length,
+    1 => _corrDone.length,
+    2 => _oaDone.length,
+    _ => _otDone.length,
+  };
   /// Id menunggu di tab aktif (untuk mode pilih banyak).
   List<String> get _currentPendingIds => switch (_tab) {
     0 => [for (final i in _leavePending) i.request.id],
@@ -386,6 +435,31 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
     2 => [for (final i in _oaPending) i.request.id],
     _ => [for (final i in _otPending) i.request.id],
   };
+
+  Future<void> _pickHistoryDate(bool isFrom) async {
+    final initial = isFrom
+        ? (_historyFrom ?? DateTime.now())
+        : (_historyTo ?? DateTime.now());
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+    );
+    if (!mounted || picked == null) return;
+    setState(() {
+      if (isFrom) {
+        _historyFrom = picked;
+      } else {
+        _historyTo = picked;
+      }
+      _historyLimit = 20;
+    });
+  }
+
+  void _loadMoreHistory() => setState(() => _historyLimit += 20);
+
+  bool get _hasMoreHistory => _historyLimit < _activeDoneCount;
 
   Widget _buildContent() {
     final leavePending = _leavePending;
@@ -476,100 +550,155 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
           style: textTheme.bodySmall,
         ),
         const SizedBox(height: AppSpacing.lg),
-        if (_tab == 0) ...[
-          section<LeaveReviewItem>(
-            label: 'Menunggu persetujuan',
-            items: leavePending,
-            row: (i) => _LeaveRow(
-              item: i,
-              onTap: () => _openLeave(i),
-              showCheckbox: _selecting,
-              checked: _selected.contains(i.request.id),
-              onChecked: (v) => _toggleSelect(i.request.id, v),
-            ),
-            emptyTitle: 'Tidak ada yang menunggu',
-            emptyMessage:
-                'Pengajuan cuti, izin, dan sakit baru muncul di sini.',
-          ),
-          const SizedBox(height: 28),
-          section<LeaveReviewItem>(
-            label: 'Sudah diproses',
-            items: leaveDone,
-            row: (i) => _LeaveRow(item: i, onTap: () => _openLeave(i)),
-            emptyTitle: 'Belum ada riwayat',
-            emptyMessage: 'Pengajuan yang disetujui/ditolak muncul di sini.',
-          ),
-        ] else if (_tab == 1) ...[
-          section<CorrectionReviewItem>(
-            label: 'Menunggu persetujuan',
-            items: corrPending,
-            row: (i) => _CorrectionRow(
-              item: i,
-              onTap: () => _openCorrection(i),
-              showCheckbox: _selecting,
-              checked: _selected.contains(i.correction.id),
-              onChecked: (v) => _toggleSelect(i.correction.id, v),
-            ),
-            emptyTitle: 'Tidak ada yang menunggu',
-            emptyMessage: 'Pengajuan koreksi absensi baru muncul di sini.',
-          ),
-          const SizedBox(height: 28),
-          section<CorrectionReviewItem>(
-            label: 'Sudah diproses',
-            items: corrDone,
-            row: (i) =>
-                _CorrectionRow(item: i, onTap: () => _openCorrection(i)),
-            emptyTitle: 'Belum ada riwayat',
-            emptyMessage: 'Koreksi yang disetujui/ditolak muncul di sini.',
-          ),
-        ] else if (_tab == 2) ...[
-          section<OutOfAreaReviewItem>(
-            label: 'Menunggu persetujuan',
-            items: oaPending,
-            row: (i) => _OutOfAreaRow(
-              item: i,
-              onTap: () => _openOutOfArea(i),
-              showCheckbox: _selecting,
-              checked: _selected.contains(i.request.id),
-              onChecked: (v) => _toggleSelect(i.request.id, v),
-            ),
-            emptyTitle: 'Tidak ada yang menunggu',
-            emptyMessage:
-                'Pengajuan clock in/out dari luar area muncul di sini.',
-          ),
-          const SizedBox(height: 28),
-          section<OutOfAreaReviewItem>(
-            label: 'Sudah diproses',
-            items: oaDone,
-            row: (i) => _OutOfAreaRow(item: i, onTap: () => _openOutOfArea(i)),
-            emptyTitle: 'Belum ada riwayat',
-            emptyMessage:
-                'Pengajuan luar area yang disetujui/ditolak muncul di sini.',
-          ),
-        ] else ...[
-          section<OvertimeReviewItem>(
-            label: 'Menunggu persetujuan',
-            items: otPending,
-            row: (i) => _OvertimeRow(
-              item: i,
-              onTap: () => _openOvertime(i),
-              showCheckbox: _selecting,
-              checked: _selected.contains(i.request.id),
-              onChecked: (v) => _toggleSelect(i.request.id, v),
-            ),
-            emptyTitle: 'Tidak ada yang menunggu',
-            emptyMessage: 'Pengajuan lembur baru muncul di sini.',
-          ),
-          const SizedBox(height: 28),
-          section<OvertimeReviewItem>(
-            label: 'Sudah diproses',
-            items: otDone,
-            row: (i) => _OvertimeRow(item: i, onTap: () => _openOvertime(i)),
-            emptyTitle: 'Belum ada riwayat',
-            emptyMessage:
-                'Pengajuan lembur yang disetujui/ditolak muncul di sini.',
-          ),
-        ],
+         SegmentToggle(
+           options: [
+             'Menunggu (${_activePendingCount})',
+             'Riwayat (${_activeDoneCount})',
+           ],
+           selectedIndex: _historyPane,
+           onSelect: (i) => setState(() {
+             _historyPane = i;
+             _historyLimit = 20;
+             _selecting = false;
+             _selected.clear();
+           }),
+         ),
+         const SizedBox(height: AppSpacing.sm),
+         if (_historyPane == 1) ...[
+           Wrap(
+             spacing: AppSpacing.sm,
+             runSpacing: AppSpacing.sm,
+             children: [
+               _DateChip(
+                 label: 'Dari',
+                 date: _historyFrom,
+                 onTap: () => _pickHistoryDate(true),
+               ),
+               _DateChip(
+                 label: 'Sampai',
+                 date: _historyTo,
+                 onTap: () => _pickHistoryDate(false),
+               ),
+               TextButton(
+                 onPressed: () => setState(() {
+                   _historyFrom =
+                       DateTime.now().subtract(const Duration(days: 30));
+                   _historyTo = DateTime.now();
+                   _historyLimit = 20;
+                 }),
+                 child: const Text('30 hari terakhir'),
+               ),
+             ],
+           ),
+           const SizedBox(height: AppSpacing.sm),
+         ],
+         if (_historyPane == 0 && _tab == 0)
+           section<LeaveReviewItem>(
+             label: 'Menunggu persetujuan',
+             items: leavePending,
+             row: (i) => _LeaveRow(
+               item: i,
+               onTap: () => _openLeave(i),
+               showCheckbox: _selecting,
+               checked: _selected.contains(i.request.id),
+               onChecked: (v) => _toggleSelect(i.request.id, v),
+             ),
+             emptyTitle: 'Tidak ada yang menunggu',
+             emptyMessage:
+                 'Pengajuan cuti, izin, dan sakit baru muncul di sini.',
+           ),
+         if (_historyPane == 0 && _tab == 1)
+           section<CorrectionReviewItem>(
+             label: 'Menunggu persetujuan',
+             items: corrPending,
+             row: (i) => _CorrectionRow(
+               item: i,
+               onTap: () => _openCorrection(i),
+               showCheckbox: _selecting,
+               checked: _selected.contains(i.correction.id),
+               onChecked: (v) => _toggleSelect(i.correction.id, v),
+             ),
+             emptyTitle: 'Tidak ada yang menunggu',
+             emptyMessage: 'Pengajuan koreksi absensi baru muncul di sini.',
+           ),
+         if (_historyPane == 0 && _tab == 2)
+           section<OutOfAreaReviewItem>(
+             label: 'Menunggu persetujuan',
+             items: oaPending,
+             row: (i) => _OutOfAreaRow(
+               item: i,
+               onTap: () => _openOutOfArea(i),
+               showCheckbox: _selecting,
+               checked: _selected.contains(i.request.id),
+               onChecked: (v) => _toggleSelect(i.request.id, v),
+             ),
+             emptyTitle: 'Tidak ada yang menunggu',
+             emptyMessage:
+                 'Pengajuan clock in/out dari luar area muncul di sini.',
+           ),
+         if (_historyPane == 0 && _tab == 3)
+           section<OvertimeReviewItem>(
+             label: 'Menunggu persetujuan',
+             items: otPending,
+             row: (i) => _OvertimeRow(
+               item: i,
+               onTap: () => _openOvertime(i),
+               showCheckbox: _selecting,
+               checked: _selected.contains(i.request.id),
+               onChecked: (v) => _toggleSelect(i.request.id, v),
+             ),
+             emptyTitle: 'Tidak ada yang menunggu',
+             emptyMessage: 'Pengajuan lembur baru muncul di sini.',
+           ),
+         if (_historyPane == 1 && _tab == 0)
+           section<LeaveReviewItem>(
+             label: 'Riwayat persetujuan',
+             items: _paged(leaveDone),
+             row: (i) => _LeaveRow(item: i, onTap: () => _openLeave(i)),
+             emptyTitle: 'Tidak ada riwayat',
+             emptyMessage:
+                 'Riwayat cuti/izin pada rentang tanggal dan nama ini tidak ditemukan.',
+           ),
+         if (_historyPane == 1 && _tab == 1)
+           section<CorrectionReviewItem>(
+             label: 'Riwayat persetujuan',
+             items: _paged(corrDone),
+             row: (i) =>
+                 _CorrectionRow(item: i, onTap: () => _openCorrection(i)),
+             emptyTitle: 'Tidak ada riwayat',
+             emptyMessage:
+                 'Koreksi absensi pada rentang tanggal dan nama ini tidak ditemukan.',
+           ),
+         if (_historyPane == 1 && _tab == 2)
+           section<OutOfAreaReviewItem>(
+             label: 'Riwayat persetujuan',
+             items: _paged(oaDone),
+             row: (i) => _OutOfAreaRow(item: i, onTap: () => _openOutOfArea(i)),
+             emptyTitle: 'Tidak ada riwayat',
+             emptyMessage:
+                 'Pengajuan absensi luar area pada rentang tanggal dan nama ini tidak ditemukan.',
+           ),
+         if (_historyPane == 1 && _tab == 3)
+           section<OvertimeReviewItem>(
+             label: 'Riwayat persetujuan',
+             items: _paged(otDone),
+             row: (i) => _OvertimeRow(item: i, onTap: () => _openOvertime(i)),
+             emptyTitle: 'Tidak ada riwayat',
+             emptyMessage:
+                 'Pengajuan lembur pada rentang tanggal dan nama ini tidak ditemukan.',
+           ),
+         if (_historyPane == 1 && _hasMoreHistory)
+           Padding(
+             padding: const EdgeInsets.only(top: AppSpacing.sm),
+             child: TextButton.icon(
+               onPressed: _loadMoreHistory,
+               icon: const Icon(Icons.expand_more, size: 18),
+               label: Text(
+                 'Muat lebih lama '
+                 '(${_activeDoneCount - _historyLimit} sisanya)',
+               ),
+             ),
+           ),
       ],
     );
   }
@@ -903,6 +1032,32 @@ class _CorrectionRow extends StatelessWidget {
           '${item.employee.fullName}, koreksi absensi $date menjadi $times. '
           'Status ${c.status.label}',
       onTap: onTap,
+    );
+  }
+}
+class _DateChip extends StatelessWidget {
+  const _DateChip({
+    required this.label,
+    required this.date,
+    required this.onTap,
+  });
+
+  final String label;
+  final DateTime? date;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton.icon(
+      onPressed: onTap,
+      icon: const Icon(Icons.event_outlined, size: 16),
+      label: Text(
+        '$label: ${date == null ? '-' : DateFormatId.shortDate(date!)}',
+      ),
+      style: OutlinedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      ),
     );
   }
 }
