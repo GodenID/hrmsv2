@@ -7,7 +7,7 @@ FROM debian:bookworm-slim AS build
 ARG API_BASE_URL
 ARG FLUTTER_VERSION
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git curl unzip xz-utils zip libglu1-mesa \
+    git curl unzip xz-utils zip libglu1-mesa ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 RUN git clone --depth 1 --branch ${FLUTTER_VERSION} \
     https://github.com/flutter/flutter.git /opt/flutter
