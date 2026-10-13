@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import 'api_time.dart';
 import '../auth_repository.dart';
 import '../employee.dart';
 import '../warning_repository.dart';
@@ -57,8 +58,7 @@ class ApiWarningRepository implements WarningRepository {
     return WarningSeverity.ringan;
   }
 
-  DateTime? _dt(Object? v) =>
-      v == null ? null : DateTime.tryParse(v.toString());
+  DateTime? _dt(Object? v) => apiDateTimeOpt(v);
 
   WarningLetter _letter(Map<String, dynamic> m) => WarningLetter(
         id: (m['id'] ?? '').toString(),
@@ -66,13 +66,13 @@ class ApiWarningRepository implements WarningRepository {
         violationName: (m['violationName'] ?? '').toString(),
         severity: _severity(m['severity']),
         level: (m['level'] as num?)?.toInt() ?? 1,
-        incidentDate: DateTime.tryParse((m['incidentDate'] ?? '').toString()) ?? DateTime.now(),
+        incidentDate: apiDateTime(m['incidentDate']),
         description: (m['description'] ?? '').toString(),
         articleRef: (m['articleRef'] ?? '').toString(),
         issuedBy: (m['issuedBy'] ?? '').toString(),
         issuedByName: (m['issuedByName'] ?? '').toString(),
-        issuedAt: DateTime.tryParse((m['issuedAt'] ?? '').toString()) ?? DateTime.now(),
-        expiresAt: DateTime.tryParse((m['expiresAt'] ?? '').toString()) ?? DateTime.now(),
+        issuedAt: apiDateTime(m['issuedAt']),
+        expiresAt: apiDateTime(m['expiresAt']),
         acknowledgedAt: _dt(m['acknowledgedAt']),
         acknowledgedBy: m['acknowledgedBy'] as String?,
         refused: (m['refused'] as bool?) ?? false,

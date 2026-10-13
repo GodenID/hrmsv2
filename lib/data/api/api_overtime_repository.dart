@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import 'api_time.dart';
 import '../auth_repository.dart';
 import '../overtime_repository.dart';
 
@@ -58,17 +59,15 @@ class ApiOvertimeRepository implements OvertimeRepository {
 
   OvertimeRequest _req(Map<String, dynamic> m) => OvertimeRequest(
         id: (m['id'] ?? '').toString(),
-        date: DateTime.tryParse((m['date'] ?? '').toString()) ?? DateTime.now(),
-        start: DateTime.tryParse((m['start'] ?? '').toString()) ?? DateTime.now(),
-        end: DateTime.tryParse((m['end'] ?? '').toString()) ?? DateTime.now(),
+        date: apiDateTime(m['date']),
+        start: apiDateTime(m['start']),
+        end: apiDateTime(m['end']),
         reason: (m['reason'] ?? '').toString(),
         status: _status(m['status']),
         submittedAt:
-            DateTime.tryParse((m['submittedAt'] ?? '').toString()) ?? DateTime.now(),
+            apiDateTime(m['submittedAt']),
         reviewedBy: m['reviewedBy'] as String?,
-        reviewedAt: m['reviewedAt'] == null
-            ? null
-            : DateTime.tryParse(m['reviewedAt'].toString()),
+        reviewedAt: apiDateTimeOpt(m['reviewedAt']),
         reviewerNote: m['reviewerNote'] as String?,
       );
 

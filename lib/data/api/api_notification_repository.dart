@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import 'api_time.dart';
 import '../auth_repository.dart';
 import '../notification_repository.dart';
 
@@ -57,7 +58,7 @@ class ApiNotificationRepository implements NotificationRepository {
         title: (m['title'] ?? '').toString(),
         body: (m['body'] ?? '').toString(),
         createdAt:
-            DateTime.tryParse((m['createdAt'] ?? '').toString()) ?? DateTime.now(),
+            apiDateTime(m['createdAt']),
         read: (m['read'] as bool?) ?? false,
       );
 

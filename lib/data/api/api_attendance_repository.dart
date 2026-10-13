@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import 'api_time.dart';
 import '../attendance_repository.dart';
 import '../auth_repository.dart';
 import '../employee.dart';
@@ -56,13 +57,10 @@ class ApiAttendanceRepository implements AttendanceRepository {
     return RequestStatus.pending;
   }
 
-  DateTime? _dt(Object? v) {
-    if (v == null || (v as String).isEmpty) return null;
-    return DateTime.tryParse(v);
-  }
+  DateTime? _dt(Object? v) => apiDateTimeOpt(v);
 
   AttendanceRecord _record(Map<String, dynamic> m) => AttendanceRecord(
-        date: DateTime.tryParse((m['date'] ?? '').toString()) ?? DateTime.now(),
+        date: apiDateTime(m['date']),
         clockIn: _dt(m['clockIn']),
         clockOut: _dt(m['clockOut']),
         clockInLocation: m['clockInLocation'] as String?,
@@ -106,25 +104,23 @@ class ApiAttendanceRepository implements AttendanceRepository {
     return LeaveRequest(
       id: (m['id'] ?? '').toString(),
       type: type,
-      start: DateTime.tryParse((m['start'] ?? '').toString()) ?? DateTime.now(),
-      end: DateTime.tryParse((m['end'] ?? '').toString()) ?? DateTime.now(),
+      start: apiDateTime(m['start']),
+      end: apiDateTime(m['end']),
       workingDays: (m['workingDays'] as num?)?.toInt() ?? 0,
       reason: (m['reason'] ?? '').toString(),
       status: status,
       submittedAt:
-          DateTime.tryParse((m['submittedAt'] ?? '').toString()) ?? DateTime.now(),
+          apiDateTime(m['submittedAt']),
       attachment: att,
       reviewedBy: m['reviewedBy'] as String?,
-      reviewedAt: m['reviewedAt'] == null
-          ? null
-          : DateTime.tryParse(m['reviewedAt'].toString()),
+      reviewedAt: apiDateTimeOpt(m['reviewedAt']),
       reviewerNote: m['reviewerNote'] as String?,
     );
   }
 
   AttendanceCorrection _correction(Map<String, dynamic> m) => AttendanceCorrection(
         id: (m['id'] ?? '').toString(),
-        date: DateTime.tryParse((m['date'] ?? '').toString()) ?? DateTime.now(),
+        date: apiDateTime(m['date']),
         clockIn: _dt(m['clockIn']) ?? DateTime.now(),
         clockOut: _dt(m['clockOut']) ?? DateTime.now(),
         reason: (m['reason'] ?? '').toString(),
@@ -137,7 +133,7 @@ class ApiAttendanceRepository implements AttendanceRepository {
 
   OutOfAreaRequest _ooa(Map<String, dynamic> m) => OutOfAreaRequest(
         id: (m['id'] ?? '').toString(),
-        date: DateTime.tryParse((m['date'] ?? '').toString()) ?? DateTime.now(),
+        date: apiDateTime(m['date']),
         kind: OutOfAreaKind.values.firstWhere(
           (k) => k.name == m['kind'],
           orElse: () => OutOfAreaKind.clockIn,
@@ -158,7 +154,7 @@ class ApiAttendanceRepository implements AttendanceRepository {
 
   OvertimeRequest _overtime(Map<String, dynamic> m) => OvertimeRequest(
         id: (m['id'] ?? '').toString(),
-        date: DateTime.tryParse((m['date'] ?? '').toString()) ?? DateTime.now(),
+        date: apiDateTime(m['date']),
         start: _dt(m['start']) ?? DateTime.now(),
         end: _dt(m['end']) ?? DateTime.now(),
         reason: (m['reason'] ?? '').toString(),
@@ -278,7 +274,7 @@ class ApiAttendanceRepository implements AttendanceRepository {
       [
         for (final e in (m['days'] as List? ?? []))
           AttendanceDay(
-            date: DateTime.tryParse((_map(e)['date'] ?? '').toString()) ?? DateTime.now(),
+            date: apiDateTime(_map(e)['date']),
             status: _dayStatus(_map(e)['status']),
             clockIn: _dt(_map(e)['clockIn']),
             clockOut: _dt(_map(e)['clockOut']),

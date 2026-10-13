@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import 'api_time.dart';
 import '../auth_repository.dart';
 import '../employee_repository.dart';
 
@@ -69,10 +70,7 @@ class ApiEmployeeRepository implements EmployeeRepository {
         phone: (ecm['phone'] ?? '').toString(),
       );
     }
-    DateTime? dt(Object? v) {
-      if (v == null || (v as String).isEmpty) return null;
-      return DateTime.tryParse(v);
-    }
+    DateTime? dt(Object? v) => apiDateTimeOpt(v);
 
     return EmployeeAccount(
       username: (m['username'] ?? '').toString(),

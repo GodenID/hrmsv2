@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import 'api_time.dart';
 import '../auth_repository.dart';
 import '../profile_repository.dart';
 import 'api_upload_repository.dart';
@@ -78,16 +79,14 @@ class ApiProfileRepository implements ProfileRepository {
         EmploymentStatus.permanent,
       ),
       contractMonths: (m['contractMonths'] as num?)?.toInt(),
-      joinDate: DateTime.tryParse((m['joinDate'] ?? '').toString()) ?? DateTime.now(),
+      joinDate: apiDateTime(m['joinDate']),
       email: (m['email'] ?? '').toString(),
       phone: (m['phone'] ?? '').toString(),
       nikMasked: (m['nikMasked'] ?? '').toString(),
       managerName: m['managerName'] as String?,
       gender: m['gender'] == null ? null : _enumOf(Gender.values, m['gender'], Gender.male),
       birthPlace: m['birthPlace'] as String?,
-      birthDate: m['birthDate'] == null
-          ? null
-          : DateTime.tryParse(m['birthDate'].toString()),
+      birthDate: apiDateTimeOpt(m['birthDate']),
       address: m['address'] as String?,
       emergencyContact: ec,
     );

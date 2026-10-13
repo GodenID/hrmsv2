@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import 'api_time.dart';
 import '../auth_repository.dart';
 import '../leave_repository.dart';
 
@@ -64,7 +65,7 @@ class ApiLeaveRepository implements LeaveRepository {
   }
 
   DateTime _dt(Object? v, [DateTime? fallback]) =>
-      DateTime.tryParse((v ?? '').toString()) ?? fallback ?? DateTime.now();
+      apiDateTime(v, fallback);
 
   LeaveRequest _req(Map<String, dynamic> m) {
     LeaveAttachment? att;
@@ -87,7 +88,7 @@ class ApiLeaveRepository implements LeaveRepository {
       submittedAt: _dt(m['submittedAt']),
       attachment: att,
       reviewedBy: m['reviewedBy'] as String?,
-      reviewedAt: m['reviewedAt'] == null ? null : _dt(m['reviewedAt']),
+      reviewedAt: apiDateTimeOpt(m['reviewedAt']),
       reviewerNote: m['reviewerNote'] as String?,
     );
   }

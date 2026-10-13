@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import 'api_time.dart';
 import '../auth_repository.dart';
 import '../event_repository.dart';
 
@@ -68,7 +69,7 @@ class ApiEventRepository implements EventRepository {
         fullName: (m['fullName'] ?? '').toString(),
         role: _crewRole(m['role']),
         note: (m['note'] ?? '').toString(),
-        joinedAt: DateTime.tryParse((m['joinedAt'] ?? '').toString()) ?? DateTime.now(),
+        joinedAt: apiDateTime(m['joinedAt']),
       );
 
   EventItem _item(Map<String, dynamic> m) {
@@ -81,8 +82,8 @@ class ApiEventRepository implements EventRepository {
         id: (cat['id'] ?? '').toString(),
         name: (cat['name'] ?? '').toString(),
       ),
-      startDate: DateTime.tryParse((m['startDate'] ?? '').toString()) ?? DateTime.now(),
-      endDate: DateTime.tryParse((m['endDate'] ?? '').toString()) ?? DateTime.now(),
+      startDate: apiDateTime(m['startDate']),
+      endDate: apiDateTime(m['endDate']),
       location: (m['location'] ?? '').toString(),
       size: _size(m['size']),
       createdBy: (m['createdBy'] ?? '').toString(),

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import 'api_time.dart';
 import '../announcement_repository.dart';
 import '../auth_repository.dart';
 
@@ -67,13 +68,9 @@ class ApiAnnouncementRepository implements AnnouncementRepository {
         title: (m['title'] ?? '').toString(),
         body: (m['body'] ?? '').toString(),
         authorName: (m['authorName'] ?? '').toString(),
-        publishedAt: DateTime.tryParse((m['publishedAt'] ?? '').toString()) ?? DateTime.now(),
-        updatedAt: m['updatedAt'] == null
-            ? null
-            : DateTime.tryParse(m['updatedAt'].toString()),
-        expiresAt: m['expiresAt'] == null
-            ? null
-            : DateTime.tryParse(m['expiresAt'].toString()),
+        publishedAt: apiDateTime(m['publishedAt']),
+        updatedAt: apiDateTimeOpt(m['updatedAt']),
+        expiresAt: apiDateTimeOpt(m['expiresAt']),
         pinned: (m['pinned'] as bool?) ?? false,
         targetDivisions: [
           for (final v in (m['targetDivisions'] as List? ?? [])) _div(v),
@@ -142,7 +139,7 @@ class ApiAnnouncementRepository implements AnnouncementRepository {
         for (final e in (m['viewed'] as List? ?? []))
           AnnouncementViewer(
             employee: _ref(_map(_map(e)['employee'])),
-            viewedAt: DateTime.tryParse((_map(e)['viewedAt'] ?? '').toString()) ?? DateTime.now(),
+            viewedAt: apiDateTime(_map(e)['viewedAt']),
           ),
       ],
       notViewed: [
