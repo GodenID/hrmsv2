@@ -7,6 +7,7 @@ import 'package:shelf_router/shelf_router.dart';
 
 import 'authz.dart';
 import 'config.dart';
+import 'dates.dart';
 import 'db.dart';
 import 's3.dart';
 import 'validate.dart';
@@ -290,11 +291,110 @@ Router uploadRouter(Db db, Config cfg) {
           throw const _Http(422, 'Password baru tidak boleh sama dengan password lama.');
         }
         await tx.execute(Sql.named(
-            'UPDATE users SET password_hash=@p, updated_at=now() WHERE id=@i::uuid'),
+            'UPDATE users SET password_hash=@p, must_change_password=FALSE, updated_at=now() WHERE id=@i::uuid'),
             parameters: {
               'p': BCrypt.hashpw(next, BCrypt.gensalt()),
               'i': (u['id'] as Object).toString(),
             });
+      });
+      return json({'ok': true});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  // ---------- lengkapi profil (login pertama akun bulk) ----------
+  r.put('/profile/complete', (Request req) async {
+    try {
+      final u = await me(req);
+      final b = await readJson(req);
+      String s(String k) => ((b[k] ?? '') as Object).toString();
+      final fullName = s('fullName').trim();
+      final nik = s('nik').trim();
+      final birthPlace = s('birthPlace').trim();
+      final birthDate = s('birthDate').isEmpty
+          ? null
+          : dateOnly(
+              DateTime.tryParse(s('birthDate')) ?? DateTime(1970));
+      final gender = s('gender');
+      final address = s('address').trim();
+      final email = s('email').trim().toLowerCase();
+      final phone = s('phone').trim();
+      final en = s('emergencyName').trim();
+      final er = s('emergencyRelation').trim();
+      final ep = s('emergencyPhone').trim();
+      final err = validateFullName(fullName) ??
+          validateNik(nik) ??
+          (birthPlace.length < 2 ? 'Tempat lahir minimal 2 karakter.' : null) ??
+          (birthDate == null ? 'Tanggal lahir tidak valid.' : null) ??
+          (!genders.contains(gender) ? 'Jenis kelamin tidak dikenal.' : null) ??
+          (address.length < 10
+              ? 'Tulis alamat lengkap: jalan, RT/RW, kelurahan, kota'
+              : null) ??
+          validateEmail(email) ??
+          validatePhone(phone) ??
+          (en.length < 2 ? 'Nama kontak darurat minimal 2 karakter.' : null) ??
+          validatePhone(ep);
+      if (err != null) return json({'message': err}, status: 422);
+      if (canonicalPhone(ep) == canonicalPhone(phone)) {
+        return json(
+            {'message': 'Gunakan nomor orang lain, bukan nomor HP Anda sendiri.'},
+            status: 422);
+      }
+      // usia kerja minimum 17 tahun
+      final today = dateOnly(DateTime.now().toUtc().add(const Duration(hours: 7)));
+      var age = today.year - birthDate!.year;
+      if (today.month < birthDate.month ||
+          (today.month == birthDate.month && today.day < birthDate.day)) {
+        age--;
+      }
+      if (age < 17) {
+        return json({'message': 'Usia minimal 17 tahun.'}, status: 422);
+      }
+      await db.pool.runTx((tx) async {
+        for (final c in [
+          ['nik', nik, 'NIK ini sudah terdaftar.'],
+          ['email', email, 'Email ini sudah dipakai akun lain.'],
+        ]) {
+          final dup = await tx.execute(Sql.named(
+            'SELECT 1 FROM users WHERE ${c[0]}=@v AND id<>@i::uuid LIMIT 1',
+          ), parameters: {
+            'v': c[1],
+            'i': (u['id'] as Object).toString(),
+          });
+          if (dup.isNotEmpty) throw _Http(409, c[2]);
+        }
+        final phones = await tx.execute(Sql.named(
+          'SELECT phone FROM users WHERE id<>@i::uuid',
+        ), parameters: {
+          'i': (u['id'] as Object).toString(),
+        });
+        final canon = canonicalPhone(phone);
+        for (final row in phones) {
+          if (canonicalPhone((row.toColumnMap()['phone'] ?? '').toString()) == canon) {
+            throw const _Http(409, 'Nomor HP ini sudah dipakai akun lain.');
+          }
+        }
+        await tx.execute(Sql.named('''
+          UPDATE users SET full_name=@fn, nik=@nik, birth_place=@bp,
+            birth_date=@bd, gender=@g, address=@ad, email=@em, phone=@ph,
+            emergency_name=@en, emergency_relation=@er, emergency_phone=@ep,
+            profile_complete=TRUE, updated_at=now()
+          WHERE id=@i::uuid
+        '''), parameters: {
+          'fn': fullName,
+          'nik': nik,
+          'bp': birthPlace,
+          'bd': birthDate.toIso8601String().substring(0, 10),
+          'g': gender,
+          'ad': address,
+          'em': email,
+          'ph': phone,
+          'en': en,
+          'er': er.isEmpty ? null : er,
+          'ep': ep,
+          'i': (u['id'] as Object).toString(),
+        });
       });
       return json({'ok': true});
     } on _Http catch (h) {

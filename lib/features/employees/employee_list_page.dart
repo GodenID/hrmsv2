@@ -12,7 +12,6 @@ import '../../core/widgets/segment_toggle.dart';
 import '../../data/auth_repository.dart';
 import '../../data/employee_repository.dart';
 import '../shell/shell_routes.dart';
-import 'widgets/registration_toggle_panel.dart';
 
 /// Daftar karyawan (semua role dapat melihat) + pencarian.
 /// Tambah / ubah hanya Super Admin.
@@ -90,6 +89,14 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     }
   }
 
+  Future<void> _createBulk() async {
+    final created = await Navigator.of(context)
+        .pushNamed<int>(ShellRoutes.employeeBulk);
+    if (created != null && created > 0 && mounted) {
+      showAppSnackBar(context, '$created akun karyawan dibuat.');
+    }
+  }
+
   void _open(EmployeeAccount e) {
     Navigator.of(context).pushNamed(ShellRoutes.employeeDetail, arguments: e);
   }
@@ -123,7 +130,20 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
       title: 'Karyawan',
       onRefresh: _load,
       actions: [
-        if (canAdd)
+        if (canAdd) ...[
+          if (isWide)
+            FilledButton.icon(
+              onPressed: _createBulk,
+              style: FilledButton.styleFrom(minimumSize: const Size(0, 40)),
+              icon: const Icon(Icons.group_add_outlined, size: 18),
+              label: const Text('Bulk'),
+            )
+          else
+            TextButton.icon(
+              onPressed: _createBulk,
+              icon: const Icon(Icons.group_add_outlined, size: 18),
+              label: const Text('Bulk'),
+            ),
           if (isWide)
             FilledButton.icon(
               onPressed: _create,
@@ -137,6 +157,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
               icon: const Icon(Icons.person_add_alt, size: 18),
               label: const Text('Tambah'),
             ),
+        ],
       ],
       child: AsyncBody(
         isLoading: _isLoading,
@@ -165,10 +186,6 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (SessionScope.userOf(context).role.canManageRegistration) ...[
-          const RegistrationTogglePanel(),
-          const SizedBox(height: AppSpacing.lg),
-        ],
         TextField(
           controller: _searchController,
           textInputAction: TextInputAction.search,

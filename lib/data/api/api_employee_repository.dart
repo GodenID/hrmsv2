@@ -177,6 +177,43 @@ class ApiEmployeeRepository implements EmployeeRepository {
   }
 
   @override
+  Future<List<EmployeeCredential>> createBulk(
+    AuthUser actor, {
+    required int count,
+    required UserRole role,
+    required Division division,
+    required EmploymentStatus employmentStatus,
+    int? contractMonths,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/employees/bulk'),
+      headers: await _h(),
+      body: jsonEncode({
+        'count': count,
+        'role': role.name,
+        'division': division.name,
+        'employmentStatus': employmentStatus.name,
+        'contractMonths': contractMonths,
+      }),
+    );
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      _throw(res.body, res.statusCode);
+    }
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    _ping();
+    Map<String, dynamic> em(Object? e) => Map<String, dynamic>.from(e as Map);
+    return List<EmployeeCredential>.unmodifiable(
+      [
+        for (final e in (m['accounts'] as List? ?? []))
+          EmployeeCredential(
+            username: (em(e)['username'] ?? '').toString(),
+            temporaryPassword: (em(e)['temporaryPassword'] ?? '').toString(),
+          ),
+      ],
+    );
+  }
+
+  @override
   Future<EmployeeAccount> updateEmployee(
     AuthUser actor, {
     required String username,

@@ -15,6 +15,7 @@ import '../approvals/overtime_review_page.dart';
 import '../attendance/correction_form_page.dart';
 import '../attendance_locations/location_form_page.dart';
 import '../employees/employee_detail_page.dart';
+import '../employees/employee_bulk_page.dart';
 import '../employees/employee_form_page.dart';
 import '../leave/leave_detail_page.dart';
 import '../leave/leave_form_page.dart';
@@ -57,6 +58,7 @@ abstract final class ShellRoutes {
   static const String overtimeReview = '/persetujuan/lembur';
   static const String employeeDetail = '/karyawan/detail';
   static const String employeeForm = '/karyawan/form';
+  static const String employeeBulk = '/karyawan/bulk';
   static const String notifications = '/notifikasi';
   static const String locationForm = '/lokasi-absen/form';
   static const String warningDetail = '/peringatan/detail';
@@ -129,6 +131,9 @@ abstract final class ShellRoutes {
           (_) =>
               EmployeeFormPage(initial: args is EmployeeAccount ? args : null),
         );
+      case employeeBulk:
+        // Pop dengan jumlah akun yang dibuat (int) bila berhasil.
+        return page<int>((_) => const EmployeeBulkPage());
       case notifications:
         return page<void>((_) => const NotificationsPage());
       case locationForm:

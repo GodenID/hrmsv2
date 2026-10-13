@@ -141,11 +141,22 @@ class AuthUser {
     required this.username,
     required this.fullName,
     required this.role,
+    this.mustChangePassword = false,
+    this.profileIncomplete = false,
   });
 
   final String username;
   final String fullName;
   final UserRole role;
+
+  /// Login pertama (password sementara): wajib ganti sebelum masuk.
+  final bool mustChangePassword;
+
+  /// Data diri belum lengkap: wajib isi formulir sebelum masuk.
+  final bool profileIncomplete;
+
+  /// Wajib onboarding (ganti password dan/atau lengkapi profil).
+  bool get needsOnboarding => mustChangePassword || profileIncomplete;
 
   /// Inisial untuk avatar, mis. "Budi Santoso" -> "BS".
   String get initials {

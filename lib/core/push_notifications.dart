@@ -94,6 +94,7 @@ abstract final class PushNotifications {
                 channelDescription: _channel.description,
                 importance: Importance.max,
                 priority: Priority.high,
+                icon: 'ic_stat_notify',
               ),
               iOS: const DarwinNotificationDetails(),
             ),

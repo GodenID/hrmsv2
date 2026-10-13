@@ -40,8 +40,8 @@ String? validatePhone(String? v) {
   final s = (v ?? '').trim();
   if (s.isEmpty) return 'Nomor telepon wajib diisi';
   final digits = s.replaceAll(RegExp(r'\D'), '').length;
-  if (!phoneRe.hasMatch(s) || digits < 9 || digits > 15) {
-    return 'Nomor telepon 9–15 digit, mis. 0812-3456-7890';
+  if (!phoneRe.hasMatch(s) || digits < 9 || digits > 13) {
+    return 'Nomor telepon 9–13 digit, mis. 0812-3456-7890';
   }
   return null;
 }

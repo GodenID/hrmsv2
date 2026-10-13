@@ -727,6 +727,23 @@ Router attendanceRouter(Db db, Config cfg) {
           'i': id,
         });
         final cm = upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        if (approve) {
+          // Tulis jam koreksi ke riwayat agar validasi sisi & rekap
+          // mengenalinya (koreksi menggantikan catatan — overwrite).
+          final cDate = dateOnly(cm['date'] as DateTime);
+          final ds = cDate.toIso8601String().substring(0, 10);
+          await tx.execute(Sql.named('''
+            INSERT INTO attendance_records(user_id, date, clock_in, clock_out)
+            VALUES(@i::uuid, @d, @ci, @co)
+            ON CONFLICT (user_id, date) DO UPDATE
+            SET clock_in=@ci, clock_out=@co
+          '''), parameters: {
+            'i': (m['user_id'] as Object).toString(),
+            'd': ds,
+            'ci': (cm['clock_in'] as DateTime).toUtc().toIso8601String(),
+            'co': (cm['clock_out'] as DateTime).toUtc().toIso8601String(),
+          });
+        }
         await notifyTx(tx, m['username'] as String,
             kind: approve ? 'correctionApproved' : 'correctionRejected',
             title: approve ? 'Koreksi absensi disetujui' : 'Koreksi absensi ditolak',
@@ -981,15 +998,13 @@ Router attendanceRouter(Db db, Config cfg) {
           final reqAt = rm['requested_at'] as DateTime;
           final loc =
               '${(rm['nearest_location'] ?? 'Luar area').toString()} (luar area)';
-          final rec = await tx.execute(Sql.named(
-            'SELECT clock_in, clock_out FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
-          ), parameters: {
-            'i': (m['user_id'] as Object).toString(),
-            'd': reqDate.toIso8601String().substring(0, 10),
-          });
-          final has = rec.isNotEmpty ? rec.first.toColumnMap() : null;
+          final ds = reqDate.toIso8601String().substring(0, 10);
+          // Sisi efektif (riwayat ATAU yang sudah disetujui): koreksi yang
+          // disetujui lebih dulu ikut diakui agar tidak "belum ada clock in".
+          final eff = await effectiveSides(
+              tx, (m['user_id'] as Object).toString(), ds);
           if (rm['kind'] == 'clockIn') {
-            if (has?['clock_in'] != null) {
+            if (eff.ci != null) {
               throw const _Http(400, 'Jam clock in sudah tercatat. Muat ulang untuk melihat status terbaru.');
             }
             await tx.execute(Sql.named('''
@@ -1003,15 +1018,16 @@ Router attendanceRouter(Db db, Config cfg) {
               'l': loc,
             });
           } else {
-            if (has == null || has['clock_in'] == null) {
+            if (eff.ci == null) {
               throw const _Http(400, 'Belum ada clock in pada tanggal ini.');
             }
-            if (has['clock_out'] != null) {
+            if (eff.co != null) {
               throw const _Http(400, 'Jam clock out sudah tercatat. Muat ulang untuk melihat status terbaru.');
             }
             await tx.execute(Sql.named('''
-              UPDATE attendance_records SET clock_out=@t, clock_out_location=@l
-              WHERE user_id=@i::uuid AND date=@d
+              INSERT INTO attendance_records(user_id, date, clock_out, clock_out_location)
+              VALUES(@i::uuid, @d, @t, @l)
+              ON CONFLICT (user_id, date) DO UPDATE SET clock_out=@t, clock_out_location=@l
             '''), parameters: {
               'i': (m['user_id'] as Object).toString(),
               'd': reqDate.toIso8601String().substring(0, 10),

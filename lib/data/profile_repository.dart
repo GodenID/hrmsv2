@@ -33,6 +33,15 @@ abstract class ProfileRepository {
     AuthUser user, {
     required ContactInfoDraft draft,
   });
+
+  /// Melengkapi data diri (login pertama akun bulk): nama, NIK, tempat &
+  /// tanggal lahir, jenis kelamin, alamat, email, HP, kontak darurat.
+  /// Menandai profil lengkap. Server WAJIB memvalidasi ulang termasuk
+  /// keunikan NIK / email / HP terhadap akun lain.
+  Future<EmployeeProfile> completeProfile(
+    AuthUser user, {
+    required ProfileCompletionDraft draft,
+  });
 }
 
 /// Isi formulir "Ubah data kontak".
@@ -45,6 +54,31 @@ class ContactInfoDraft {
 
   final String phone;
   final String address;
+  final EmergencyContact emergencyContact;
+}
+
+/// Isi formulir "Lengkapi data diri" (login pertama akun bulk).
+class ProfileCompletionDraft {
+  const ProfileCompletionDraft({
+    required this.fullName,
+    required this.nik,
+    required this.birthPlace,
+    required this.birthDate,
+    required this.gender,
+    required this.address,
+    required this.email,
+    required this.phone,
+    required this.emergencyContact,
+  });
+
+  final String fullName;
+  final String nik;
+  final String birthPlace;
+  final DateTime birthDate;
+  final Gender gender;
+  final String address;
+  final String email;
+  final String phone;
   final EmergencyContact emergencyContact;
 }
 

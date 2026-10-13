@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import '../../core/utils/validators.dart';
+import '../../core/utils/work_calendar.dart';
 import '../auth_repository.dart';
 import '../employee_repository.dart';
 import '../profile_repository.dart';
@@ -144,6 +145,66 @@ class MockProfileRepository implements ProfileRepository {
   }
 
   @override
+  Future<EmployeeProfile> completeProfile(
+    AuthUser user, {
+    required ProfileCompletionDraft draft,
+  }) async {
+    await Future<void>.delayed(latency);
+    final a = _account(user);
+    if (!a.active) {
+      throw const AuthException('Akun Anda sudah dinonaktifkan.');
+    }
+    _check(EmployeeRules.validateFullName(draft.fullName));
+    _check(EmployeeRules.validateNik(draft.nik));
+    _check(RegistrationRules.validateBirthPlace(draft.birthPlace));
+    _check(
+      RegistrationRules.validateBirthDate(draft.birthDate, now: store.now()),
+    );
+    _check(
+      RegistrationRules.validateAddress(draft.address),
+    );
+    _check(EmployeeRules.validateEmail(draft.email));
+    _check(EmployeeRules.validatePhone(draft.phone));
+    final ec = draft.emergencyContact;
+    _check(RegistrationRules.validateEmergencyName(ec.name));
+    _check(EmployeeRules.validatePhone(ec.phone));
+    _check(RegistrationRules.emergencyPhoneConflict(ec.phone, draft.phone));
+    final nik = draft.nik.trim();
+    final email = draft.email.trim().toLowerCase();
+    final phoneCanon = PhoneNumbers.canonical(draft.phone.trim());
+    for (final other in store.accounts.values) {
+      if (other.username == a.username) continue;
+      if (other.nik == nik) {
+        throw const AppException('NIK ini sudah dipakai akun lain.');
+      }
+      if (other.email.toLowerCase() == email) {
+        throw const AppException('Email ini sudah dipakai akun lain.');
+      }
+      if (phoneCanon.isNotEmpty &&
+          PhoneNumbers.canonical(other.phone) == phoneCanon) {
+        throw const AppException('Nomor HP ini sudah dipakai akun lain.');
+      }
+    }
+    a
+      ..fullName = draft.fullName.trim()
+      ..nik = nik
+      ..birthPlace = draft.birthPlace.trim()
+      ..birthDate = WorkCalendar.dateOnly(draft.birthDate)
+      ..gender = draft.gender
+      ..address = draft.address.trim()
+      ..email = email
+      ..phone = draft.phone.trim()
+      ..emergencyContact = EmergencyContact(
+        name: ec.name.trim(),
+        relation: ec.relation,
+        phone: ec.phone.trim(),
+      )
+      ..profileComplete = true;
+    store.employeeChanges.ping();
+    return _toProfile(a);
+  }
+
+  @override
   Future<void> changePassword(
     AuthUser user, {
     required String currentPassword,
@@ -166,5 +227,6 @@ class MockProfileRepository implements ProfileRepository {
       );
     }
     a.password = newPassword;
+    a.mustChangePassword = false;
   }
 }

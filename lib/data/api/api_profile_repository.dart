@@ -194,4 +194,30 @@ class ApiProfileRepository implements ProfileRepository {
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
     return _profile(jsonDecode(res.body) as Map<String, dynamic>);
   }
+
+  @override
+  Future<EmployeeProfile> completeProfile(
+    AuthUser user, {
+    required ProfileCompletionDraft draft,
+  }) async {
+    final res = await _client.put(
+      Uri.parse('$_base/profile/complete'),
+      headers: await _h(),
+      body: jsonEncode({
+        'fullName': draft.fullName,
+        'nik': draft.nik,
+        'birthPlace': draft.birthPlace,
+        'birthDate': draft.birthDate.toIso8601String().substring(0, 10),
+        'gender': draft.gender.name,
+        'address': draft.address,
+        'email': draft.email,
+        'phone': draft.phone,
+        'emergencyName': draft.emergencyContact.name,
+        'emergencyRelation': draft.emergencyContact.relation.name,
+        'emergencyPhone': draft.emergencyContact.phone,
+      }),
+    );
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    return _profile(jsonDecode(res.body) as Map<String, dynamic>);
+  }
 }

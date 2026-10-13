@@ -546,6 +546,11 @@ class MockAccount {
   String? address;
   EmergencyContact? emergencyContact;
 
+  /// Password sementara (akun bulk / direset): wajib diganti saat login.
+  bool mustChangePassword = false;
+
+  /// Data diri belum lengkap (akun bulk): wajib isi formulir saat login.
+  bool profileComplete = true;
   /// Kapan persetujuan privasi diberikan saat pendaftaran (null = akun lama
   /// atau dibuat sebelum fitur consent ada).
   DateTime? privacyConsentedAt;
@@ -553,8 +558,13 @@ class MockAccount {
   /// Foto profil (PNG / JPEG), null = avatar inisial.
   Uint8List? photo;
 
-  AuthUser toUser() =>
-      AuthUser(username: username, fullName: fullName, role: role);
+  AuthUser toUser() => AuthUser(
+        username: username,
+        fullName: fullName,
+        role: role,
+        mustChangePassword: mustChangePassword,
+        profileIncomplete: !profileComplete,
+      );
 
   EmployeeRef toRef() => EmployeeRef(username: username, fullName: fullName);
 }

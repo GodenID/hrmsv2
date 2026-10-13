@@ -294,12 +294,81 @@ class MockEmployeeRepository implements EmployeeRepository {
       password: password,
     );
     _apply(account, draft);
+    // Akun buatan admin: wajib ganti password saat login pertama.
+    // Data dari formulir admin sudah lengkap.
+    account.mustChangePassword = true;
+    account.profileComplete = true;
     store.accounts[name] = account;
     store.employeeChanges.ping();
     return EmployeeCreated(
       account: _toAccount(actor, account),
       temporaryPassword: password,
     );
+  }
+
+  @override
+  Future<List<EmployeeCredential>> createBulk(
+    AuthUser actor, {
+    required int count,
+    required UserRole role,
+    required Division division,
+    required EmploymentStatus employmentStatus,
+    int? contractMonths,
+  }) async {
+    await Future<void>.delayed(latency);
+    _requireSuperAdmin(actor);
+    if (count < 1 || count > 50) {
+      throw const AppException('Jumlah akun 1–50 per sekali buat.');
+    }
+    if (role != UserRole.staff && role != UserRole.manager) {
+      throw const AppException('Role massal hanya Staff atau Manager.');
+    }
+    if (employmentStatus.requiresDuration &&
+        (contractMonths == null || contractMonths < 1)) {
+      throw const AppException('Isi durasi kontrak/magang dalam bulan.');
+    }
+    final out = <EmployeeCredential>[];
+    for (var i = 0; i < count; i++) {
+      final username = _randomUsername();
+      final password = _temporaryPassword();
+      final account = MockAccount(
+        username: username,
+        fullName: 'Karyawan Baru',
+        role: role,
+        nik: '',
+        employeeId: store.nextEmployeeId(),
+        position: 'Staf',
+        division: division,
+        employmentStatus: employmentStatus,
+        contractMonths: employmentStatus.requiresDuration
+            ? contractMonths
+            : null,
+        joinDate: WorkCalendar.dateOnly(store.now()),
+        email: '',
+        phone: '',
+        password: password,
+      );
+      account.mustChangePassword = true;
+      account.profileComplete = false;
+      store.accounts[username] = account;
+      out.add(
+        EmployeeCredential(username: username, temporaryPassword: password),
+      );
+    }
+    store.employeeChanges.ping();
+    return List.unmodifiable(out);
+  }
+
+  String _randomUsername() {
+    const letters = 'abcdefghjkmnpqrstuvwxyz';
+    const digits = '23456789';
+    String pick(String s) => s[_random.nextInt(s.length)];
+    for (var attempt = 0; attempt < 50; attempt++) {
+      final candidate =
+          'pg${pick(letters)}${pick(letters)}${List.generate(4, (_) => pick(digits)).join()}';
+      if (store.account(candidate) == null) return candidate;
+    }
+    throw const AppException('Gagal membuat username unik. Coba lagi.');
   }
 
   @override
@@ -374,6 +443,7 @@ class MockEmployeeRepository implements EmployeeRepository {
     final password = _temporaryPassword();
     // Server sungguhan juga WAJIB mencabut semua sesi akun ini.
     a.password = password;
+    a.mustChangePassword = true;
     return password;
   }
 

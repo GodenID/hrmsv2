@@ -40,6 +40,8 @@ Map<String, dynamic> userJson(Map<String, dynamic> r) => {
       'username': r['username'],
       'fullName': r['full_name'],
       'role': r['role'],
+      'mustChangePassword': r['must_change_password'] == true,
+      'profileIncomplete': r['profile_complete'] != true,
     };
 
 Future<bool> registrationOpen(TxSession tx) async {
@@ -141,7 +143,7 @@ Router authRouter(Db db, Config cfg) {
             emergency_name, emergency_relation, emergency_phone, privacy_consented_at)
           VALUES(@u,@fn,@role,@nik,@eid,'Staf',@div,@es,@cm,@jd,@em,@ph,
             @pw,@g,@bp,@bd,@ad,@en,@er,@ep,@pc)
-          RETURNING id, username, full_name, role
+          RETURNING *
         '''), parameters: {
           'u': name,
           'fn': s('fullName').trim(),
@@ -182,7 +184,8 @@ Router authRouter(Db db, Config cfg) {
                 body: '${row['full_name']} mendaftar sebagai Staff.');
           }
         }
-        return {'token': token, 'user': {'username': row['username'], 'fullName': row['full_name'], 'role': row['role']}};
+        final um = row.map((k, v) => MapEntry(k.toString(), v));
+        return {'token': token, 'user': userJson(um)};
       });
       return json(out, status: 201);
     } on _Http catch (h) {
@@ -303,7 +306,7 @@ Router authRouter(Db db, Config cfg) {
   r.get('/auth/me', (Request req) async {
     final u = await authed(req);
     if (u == null) return json({'message': 'Sesi berakhir. Silakan masuk kembali.'}, status: 401);
-    return json({'user': {'username': u['username'], 'fullName': u['full_name'], 'role': u['role']}});
+    return json({'user': userJson(u)});
   });
 
   r.post('/auth/logout', (Request req) async {

@@ -10,6 +10,7 @@ import '../../core/widgets/brand_loading.dart';
 import '../../core/widgets/brand_mark.dart';
 import '../../data/auth_repository.dart';
 import '../shell/app_shell.dart';
+import 'complete_profile_page.dart';
 import 'login_page.dart';
 
 /// Halaman pertama: memutar video splash (6 detik, full-screen) sambil
@@ -147,7 +148,7 @@ class _StartupPageState extends State<StartupPage> {
     Future<void>.delayed(const Duration(milliseconds: 280), () {
       if (!mounted) return;
       final session = _session;
-      if (session != null) {
+      if (session != null && !session.user.needsOnboarding) {
         // Langsung ke Beranda dengan sesi yang sudah dipulihkan.
         Navigator.of(context).pushReplacement(
           _cinematicRoute<void>(
@@ -156,15 +157,39 @@ class _StartupPageState extends State<StartupPage> {
           ),
         );
       } else {
-        Navigator.of(context).pushReplacement(
-          _cinematicRoute<void>(
-            settings: const RouteSettings(name: AppRoutes.login),
-            builder: (_) => LoginPage(
-              authRepository: widget.authRepository,
-              sessionStorage: widget.sessionStorage,
+        // Tanpa sesi, atau onboarding belum tuntas (mis. password
+        // direset admin): lewat login / lengkapi profil dulu.
+        if (session != null &&
+            !session.user.mustChangePassword &&
+            session.user.profileIncomplete) {
+          final restored = session;
+          Navigator.of(context).pushReplacement(
+            _cinematicRoute<void>(
+              settings: const RouteSettings(name: AppRoutes.login),
+              builder: (_) => CompleteProfilePage(
+                user: restored.user,
+                onCompleted: () {
+                  Navigator.of(context).pushReplacement(
+                    _cinematicRoute<void>(
+                      settings: const RouteSettings(name: AppRoutes.home),
+                      builder: (_) => AppShell(session: restored),
+                    ),
+                  );
+                },
+              ),
             ),
-          ),
-        );
+          );
+        } else {
+          Navigator.of(context).pushReplacement(
+            _cinematicRoute<void>(
+              settings: const RouteSettings(name: AppRoutes.login),
+              builder: (_) => LoginPage(
+                authRepository: widget.authRepository,
+                sessionStorage: widget.sessionStorage,
+              ),
+            ),
+          );
+        }
       }
     });
   }

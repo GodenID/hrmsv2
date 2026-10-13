@@ -9,7 +9,6 @@ import 'core/theme/app_theme.dart';
 import 'data/auth_repository.dart';
 import 'features/auth/forgot_password_page.dart';
 import 'features/auth/login_page.dart';
-import 'features/auth/register_page.dart';
 import 'features/auth/startup_page.dart';
 import 'features/shell/app_shell.dart';
 
@@ -47,15 +46,6 @@ class PrasastiConnectApp extends StatelessWidget {
                 builder: (_) => ForgotPasswordPage(
                   authRepository: dependencies.auth,
                   initialUsername: args as String?,
-                ),
-              );
-            case AppRoutes.register:
-              // Mengembalikan username saat pendaftaran berhasil.
-              return MaterialPageRoute<String>(
-                settings: settings,
-                builder: (_) => RegisterPage(
-                  authRepository: dependencies.auth,
-                  platform: dependencies.platform,
                 ),
               );
             case AppRoutes.home when args is AuthSession:

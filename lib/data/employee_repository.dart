@@ -29,6 +29,19 @@ abstract class EmployeeRepository {
     required EmployeeDraft draft,
   });
 
+  /// Membuat banyak akun sekaligus dengan username & password acak.
+  /// Hanya Super Admin. Password sementara hanya dikembalikan sekali
+  /// (untuk dibagikan ke karyawan); akun wajib ganti password + lengkapi
+  /// profil saat login pertama.
+  Future<List<EmployeeCredential>> createBulk(
+    AuthUser actor, {
+    required int count,
+    required UserRole role,
+    required Division division,
+    required EmploymentStatus employmentStatus,
+    int? contractMonths,
+  });
+
   Future<EmployeeAccount> updateEmployee(
     AuthUser actor, {
     required String username,
@@ -185,6 +198,17 @@ class EmployeeCreated {
   final String temporaryPassword;
 }
 
+/// Kredensial akun massal (tampilkan SEKALI ke Super Admin untuk dibagikan).
+class EmployeeCredential {
+  const EmployeeCredential({
+    required this.username,
+    required this.temporaryPassword,
+  });
+
+  final String username;
+  final String temporaryPassword;
+}
+
 /// Aturan validasi yang sama dipakai di formulir & mock server.
 abstract final class EmployeeRules {
   static final RegExp username = RegExp(r'^[a-z][a-z0-9._]{2,29}$');
@@ -243,8 +267,8 @@ abstract final class EmployeeRules {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return 'Nomor telepon wajib diisi';
     final digits = v.replaceAll(RegExp(r'\D'), '').length;
-    if (!phone.hasMatch(v) || digits < 9 || digits > 15) {
-      return 'Nomor telepon 9–15 digit, mis. 0812-3456-7890';
+    if (!phone.hasMatch(v) || digits < 9 || digits > 13) {
+      return 'Nomor telepon 9–13 digit, mis. 0812-3456-7890';
     }
     return null;
   }

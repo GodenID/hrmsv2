@@ -32,6 +32,10 @@
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
+        <!-- Ikon notifikasi FCM: siluet putih logo Prasasti. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notify" />
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />

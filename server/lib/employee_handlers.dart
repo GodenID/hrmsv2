@@ -196,9 +196,10 @@ Router employeeRouter(Db db, Config cfg) {
           INSERT INTO users(username, full_name, role, nik, employee_id, position,
             division, employment_status, contract_months, join_date, email, phone,
             password_hash, manager_username, gender, birth_place, birth_date,
-            address, emergency_name, emergency_relation, emergency_phone)
+            address, emergency_name, emergency_relation, emergency_phone,
+            must_change_password, profile_complete)
           VALUES(@u,@fn,@role,@nik,@eid,@pos,@div,@es,@cm,@jd,@em,@ph,
-            @pw,@mgr,@g,@bp,@bd,@ad,@en,@er,@ep)
+            @pw,@mgr,@g,@bp,@bd,@ad,@en,@er,@ep,TRUE,FALSE)
           RETURNING *
         '''), parameters: {
           'u': name,
@@ -231,6 +232,100 @@ Router employeeRouter(Db db, Config cfg) {
         {'account': toAccount(created, actor, storeOf(cfg), cfg.s3avatarPublic), 'temporaryPassword': password},
         status: 201,
       );
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  String randomUsername(Random r) {
+    const letters = 'abcdefghjkmnpqrstuvwxyz';
+    const digits = '23456789';
+    String pick(String s) => s[r.nextInt(s.length)];
+    return 'pg${pick(letters)}${pick(letters)}${List.generate(4, (_) => pick(digits)).join()}';
+  }
+
+  Future<String> nextEmployeeId(TxSession tx) async {
+    final rs = await tx.execute(Sql.named(
+      "SELECT employee_id FROM users WHERE employee_id ~ '^PG-[0-9]+\$'",
+    ));
+    var max = 0;
+    for (final row in rs) {
+      final m = RegExp(r'^PG-(\d+)$')
+          .firstMatch((row.toColumnMap()['employee_id'] ?? '').toString());
+      final n = int.tryParse(m?.group(1) ?? '');
+      if (n != null && n > max) max = n;
+    }
+    return 'PG-${(max + 1).toString().padLeft(4, '0')}';
+  }
+
+  r.post('/employees/bulk', (Request req) async {
+    try {
+      await requireSuperAdmin(req);
+      final b = await readJson(req);
+      final count = (b['count'] as num?)?.toInt() ?? 0;
+      final role = ((b['role'] ?? 'staff') as String);
+      final division = ((b['division'] ?? '') as String);
+      final status = ((b['employmentStatus'] ?? 'contract') as String);
+      final months = (b['contractMonths'] as num?)?.toInt();
+      if (count < 1 || count > 50) {
+        throw const _Http(422, 'Jumlah akun 1–50 per sekali buat.');
+      }
+      if (role != 'staff' && role != 'manager') {
+        // Super Admin tidak dibuat massal (tetap manual satu per satu).
+        throw const _Http(422, 'Role massal hanya Staff atau Manager.');
+      }
+      if (!divisions.contains(division)) {
+        throw const _Http(422, 'Divisi tidak dikenal.');
+      }
+      if (!employmentStatuses.contains(status)) {
+        throw const _Http(422, 'Status kepegawaian tidak dikenal.');
+      }
+      if ((status == 'contract' || status == 'internship') &&
+          (months == null || months < 1)) {
+        throw const _Http(422, 'Isi durasi kontrak/magang dalam bulan.');
+      }
+      final r = Random.secure();
+      final created = await db.pool.runTx((tx) async {
+        final out = <Map<String, dynamic>>[];
+        for (var i = 0; i < count; i++) {
+          var name = '';
+          for (var attempt = 0; attempt < 20; attempt++) {
+            final cand = randomUsername(r);
+            final exists = await tx.execute(
+              Sql.named('SELECT 1 FROM users WHERE username=@u'),
+              parameters: {'u': cand},
+            );
+            if (exists.isEmpty) {
+              name = cand;
+              break;
+            }
+          }
+          if (name.isEmpty) {
+            throw const _Http(500, 'Gagal membuat username unik. Coba lagi.');
+          }
+          final password = tempPassword();
+          final eid = await nextEmployeeId(tx);
+          await tx.execute(Sql.named('''
+            INSERT INTO users(username, full_name, role, employee_id, position,
+              division, employment_status, contract_months, join_date,
+              password_hash, must_change_password, profile_complete)
+            VALUES(@u,'Karyawan Baru',@role,@eid,'Staf',@div,@es,@cm,@jd,
+              @pw,TRUE,FALSE)
+          '''), parameters: {
+            'u': name,
+            'role': role,
+            'eid': eid,
+            'div': division,
+            'es': status,
+            'cm': (status == 'contract' || status == 'internship') ? months : null,
+            'jd': DateTime.now().toUtc().toIso8601String().substring(0, 10),
+            'pw': BCrypt.hashpw(password, BCrypt.gensalt()),
+          });
+          out.add({'username': name, 'temporaryPassword': password});
+        }
+        return out;
+      });
+      return json({'accounts': created}, status: 201);
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }
@@ -355,7 +450,7 @@ Router employeeRouter(Db db, Config cfg) {
         }
         final pw = tempPassword();
         await tx.execute(
-          Sql.named('UPDATE users SET password_hash=@p, updated_at=now() WHERE username=@u'),
+          Sql.named('UPDATE users SET password_hash=@p, must_change_password=TRUE, updated_at=now() WHERE username=@u'),
           parameters: {'p': BCrypt.hashpw(pw, BCrypt.gensalt()), 'u': (old['username'] as String)},
         );
         await tx.execute(Sql.named(

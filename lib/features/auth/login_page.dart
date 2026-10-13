@@ -12,6 +12,8 @@ import '../../core/utils/validators.dart';
 import '../../data/api/api_auth_repository.dart' show ApiConfig;
 import '../../data/api/api_notification_repository.dart';
 import '../../data/auth_repository.dart';
+import 'complete_profile_page.dart';
+import 'force_password_page.dart';
 import 'widgets/auth_shell.dart';
 import '../../core/widgets/form_widgets.dart';
 
@@ -38,28 +40,6 @@ class _LoginPageState extends State<LoginPage> {
   bool _obscurePassword = true;
   bool _isSubmitting = false;
   String? _errorMessage;
-
-  /// Status pendaftaran dari server. false sampai terbukti dibuka, agar
-  /// tombol "Daftar akun" tidak muncul lalu hilang.
-  bool _registrationOpen = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadRegistrationStatus();
-  }
-
-  Future<void> _loadRegistrationStatus() async {
-    bool open;
-    try {
-      open = await widget.authRepository.isRegistrationOpen();
-    } catch (_) {
-      open = false;
-    }
-    if (mounted && open != _registrationOpen) {
-      setState(() => _registrationOpen = open);
-    }
-  }
 
   @override
   void dispose() {
@@ -103,8 +83,7 @@ class _LoginPageState extends State<LoginPage> {
         }
       } catch (_) {}
       if (!mounted) return;
-      Navigator.of(context)
-          .pushReplacementNamed(AppRoutes.home, arguments: session);
+      await _enter(context, session, _passwordController.text);
     } on AuthException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -120,6 +99,55 @@ class _LoginPageState extends State<LoginPage> {
         _isSubmitting = false;
       });
     }
+  }
+
+  /// Masuk + onboarding wajib (ganti password & lengkapi profil)
+  /// untuk akun bulk / setelah reset admin.
+  Future<void> _enter(
+    BuildContext context,
+    AuthSession session,
+    String password,
+  ) async {
+    var user = session.user;
+    final navigator = Navigator.of(context);
+    if (user.mustChangePassword) {
+      final ok = await navigator.push<bool>(
+        MaterialPageRoute(
+          builder: (_) => ForcePasswordPage(
+            user: user,
+            currentPassword: password,
+          ),
+        ),
+      );
+      if (ok != true || !context.mounted) return;
+      user = AuthUser(
+        username: user.username,
+        fullName: user.fullName,
+        role: user.role,
+        profileIncomplete: user.profileIncomplete,
+      );
+    }
+    if (user.profileIncomplete) {
+      final ok = await navigator.push<bool>(
+        MaterialPageRoute(
+          builder: (_) => CompleteProfilePage(user: user),
+        ),
+      );
+      if (ok != true || !context.mounted) return;
+    }
+    // Segarkan sesi (nama & flag terbaru) lalu masuk beranda.
+    AuthSession fresh = session;
+    try {
+      final token = await widget.sessionStorage.readToken();
+      if (token != null) {
+        final me = await widget.authRepository.restoreSession(token);
+        fresh = AuthSession(token: token, user: me);
+      }
+    } catch (_) {
+      // Token sesi login tetap dipakai bila pemulihan gagal.
+    }
+    if (!context.mounted) return;
+    navigator.pushReplacementNamed(AppRoutes.home, arguments: fresh);
   }
 
   Future<void> _openForgotPassword() async {
@@ -140,29 +168,6 @@ class _LoginPageState extends State<LoginPage> {
         width: isWide ? 420 : null,
         content: const Text(
           'Password berhasil diperbarui. Silakan masuk dengan password baru.',
-        ),
-      ),
-    );
-  }
-
-  Future<void> _openRegister() async {
-    final username = await Navigator.of(context)
-        .pushNamed<String>(AppRoutes.register);
-    // Status bisa berubah selama halaman daftar terbuka.
-    _loadRegistrationStatus();
-    if (!mounted || username == null) return;
-
-    // Kembali dari pendaftaran yang berhasil: isi username, fokus ke password.
-    setState(() => _errorMessage = null);
-    _usernameController.text = username;
-    _passwordController.clear();
-    _passwordFocus.requestFocus();
-    final isWide = MediaQuery.sizeOf(context).width >= 600;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        width: isWide ? 420 : null,
-        content: const Text(
-          'Akun berhasil dibuat. Silakan masuk dengan password Anda.',
         ),
       ),
     );
@@ -254,18 +259,9 @@ class _LoginPageState extends State<LoginPage> {
                 isLoading: _isSubmitting,
                 onPressed: _submit,
               ),
+              // Akun dibuat oleh Super Admin (menu Karyawan). Belum punya
+              // akun? Hubungi HR / atasan langsung.
               const SizedBox(height: AppSpacing.md),
-              // Disembunyikan bila Super Admin menutup pendaftaran.
-              if (_registrationOpen) ...[
-                Center(
-                  child: TextButton(
-                    onPressed: _isSubmitting ? null : _openRegister,
-                    child: const Text('Daftar akun'),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-              ] else
-                const SizedBox(height: AppSpacing.sm),
               const Divider(),
               const SizedBox(height: AppSpacing.lg),
               Row(
