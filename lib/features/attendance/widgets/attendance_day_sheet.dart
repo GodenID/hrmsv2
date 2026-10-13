@@ -279,16 +279,28 @@ class _DaySheet extends StatelessWidget {
                 ),
                 child: const Text('Lihat pengajuan'),
               )
-            else if (canCorrect)
+            else if (canCorrect) ...[
+              if (day.status == AttendanceDayStatus.dayOff &&
+                  correction == null) ...[
+                Text(
+                  'Hari libur. Bila Anda tetap bekerja dan lupa absen, '
+                  'ajukan absensi — jam akan diperiksa Atasan.',
+                  style: textTheme.bodySmall?.copyWith(height: 1.5),
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
               FilledButton(
                 onPressed: () =>
                     Navigator.of(context).pop(DaySheetAction.requestCorrection),
                 child: Text(
                   correction?.status == RequestStatus.rejected
-                      ? 'Ajukan koreksi lagi'
+                      ? 'Ajukan lagi'
+                      : day.clockIn == null
+                      ? 'Ajukan absensi'
                       : 'Ajukan koreksi',
                 ),
-              )
+              ),
+            ]
             else
               Text(
                 _whyNoCorrection(day),
@@ -309,9 +321,9 @@ class _DaySheet extends StatelessWidget {
       return 'Hari cuti/izin tidak memerlukan koreksi absensi.';
     }
     if (!day.date.isBefore(today)) {
-      return 'Koreksi bisa diajukan mulai besok untuk tanggal hari ini.';
+      return 'Absensi untuk hari ini bisa diajukan mulai besok.';
     }
-    return 'Koreksi hanya bisa diajukan untuk '
+    return 'Absensi hanya bisa diajukan untuk '
         '${WorkPolicy.correctionWindowDays} hari terakhir.';
   }
 }

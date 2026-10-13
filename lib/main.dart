@@ -11,7 +11,7 @@ import 'data/api/api_notification_repository.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Build production/web semua via API. Mock hanya dipakai di test doubles.
+  // Semua build berjalan via API.
   final baseUrl = ApiConfig.baseUrl;
   if (baseUrl.isEmpty) {
     // Production build harus selalu terhubung ke server.

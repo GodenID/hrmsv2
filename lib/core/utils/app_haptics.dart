@@ -11,9 +11,6 @@ abstract final class AppHaptics {
   /// Penolakan / aksi destruktif.
   static Future<void> reject() => _run(HapticFeedback.heavyImpact);
 
-  /// Sentuhan ringan (membuka lembar, mencentang pilihan).
-  static Future<void> tap() => _run(HapticFeedback.selectionClick);
-
   static Future<void> _run(Future<void> Function() fn) async {
     try {
       await fn();

@@ -126,7 +126,7 @@ abstract class AttendanceRepository {
   });
 }
 
-/// Aturan pengajuan luar area (dipakai formulir & mock server).
+/// Aturan pengajuan luar area (dipakai formulir; server menegakkan ulang).
 abstract final class OutOfAreaRules {
   static const int minReasonLength = 10;
 }
@@ -290,7 +290,7 @@ class OvertimeRequest {
   }
 }
 
-/// Aturan validasi lembur yang sama dipakai di formulir & mock server.
+/// Aturan validasi lembur yang sama dipakai di formulir; server menegakkan ulang.
 abstract final class OvertimeRules {
   /// Diajukan maksimal N hari ke belakang (hari ini boleh).
   static const int maxDaysBack = 30;
@@ -428,8 +428,6 @@ class AttendanceDay {
 
   /// Mis. "Cuti tahunan".
   String? get leaveLabel => leave?.type.label;
-
-  bool get hasPendingLeave => leave?.status == RequestStatus.pending;
 
   Duration? get worked {
     final start = clockIn;

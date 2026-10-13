@@ -59,7 +59,7 @@ class AttendanceLocationDraft {
   final int radiusMeters;
 }
 
-/// Aturan validasi lokasi absen (dipakai formulir & mock server).
+/// Aturan validasi lokasi absen (dipakai formulir; server menegakkan ulang).
 abstract final class LocationRules {
   static const int minRadius = 25;
   static const int maxRadius = 1000;
@@ -97,13 +97,6 @@ abstract final class LocationRules {
     }
     return null;
   }
-
-  static String? validateRadius(int radius) {
-    if (radius < minRadius || radius > maxRadius) {
-      return 'Radius $minRadius–$maxRadius meter';
-    }
-    return null;
-  }
 }
 
 abstract final class GeoMath {
@@ -126,24 +119,6 @@ abstract final class GeoMath {
             math.sin(dLng / 2) *
             math.sin(dLng / 2);
     return 2 * _earthRadius * math.asin(math.min(1, math.sqrt(a)));
-  }
-
-  /// Arah dari (lat1, lng1) ke (lat2, lng2), derajat 0–360
-  /// (0 = utara, 90 = timur). Dipakai menempatkan titik pengguna pada
-  /// radar area absen.
-  static double bearingDegrees(
-    double lat1,
-    double lng1,
-    double lat2,
-    double lng2,
-  ) {
-    double rad(double d) => d * math.pi / 180;
-    final dLng = rad(lng2 - lng1);
-    final y = math.sin(dLng) * math.cos(rad(lat2));
-    final x =
-        math.cos(rad(lat1)) * math.sin(rad(lat2)) -
-        math.sin(rad(lat1)) * math.cos(rad(lat2)) * math.cos(dLng);
-    return (math.atan2(y, x) * 180 / math.pi + 360) % 360;
   }
 
   /// "85 m", "1,2 km", "12 km".

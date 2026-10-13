@@ -123,7 +123,7 @@ class LeaveAttachment {
   final String name;
   final int sizeBytes;
 
-  /// Key objek di S3 (mode API). null = hanya metadata (mode mock).
+  /// Key objek di S3. null = hanya metadata.
   final String? key;
 
   static const int maxBytes = 2 * 1024 * 1024;
@@ -212,7 +212,7 @@ class LeaveBalance {
   int get available => (remaining - pending).clamp(0, quota);
 }
 
-/// Aturan validasi cuti yang sama dipakai di formulir & mock server.
+/// Aturan validasi cuti yang sama dipakai di formulir; server menegakkan ulang.
 abstract final class LeaveRules {
   static const int maxDaysAhead = 180;
   static const int sickAttachmentFromDays = 2;

@@ -30,6 +30,7 @@ class AttendanceCalendar extends StatelessWidget {
   final DateTime today;
 
   /// null = sedang memuat (semua sel netral, tidak bisa diketuk).
+  /// Hanya tanggal sampai [today] yang bisa diketuk; tanggal mendatang tidak.
   final List<AttendanceDay>? days;
   final ValueChanged<AttendanceDay> onTapDay;
 
@@ -133,12 +134,17 @@ class AttendanceCalendar extends StatelessWidget {
     final look = loading
         ? const CalendarLook(tone: CalendarTone.upcoming)
         : calendarLookFor(day, date: date, today: today);
+    // Tanggal yang sudah lewat (dan hari ini) bisa diketuk — termasuk akhir
+    // pekan/libur — untuk melihat catatan atau mengajukan absensi bila lupa.
+    // Tanggal mendatang tidak bisa diketuk.
+    final tappable =
+        !loading && day != null && !WorkCalendar.dateOnly(date).isAfter(today);
     return _DayCell(
       date: date,
       look: look,
       isToday: WorkCalendar.isSameDay(date, today),
       detailed: detailed,
-      onTap: loading || day == null ? null : () => onTapDay(day),
+      onTap: tappable ? () => onTapDay(day) : null,
     );
   }
 }

@@ -319,8 +319,10 @@ class ApiAttendanceRepository implements AttendanceRepository {
       headers: await _h(),
       body: jsonEncode({
         'date': date.toIso8601String().substring(0, 10),
-        'clockIn': clockIn.toIso8601String(),
-        'clockOut': clockOut.toIso8601String(),
+        // Kirim instant UTC (bertanda Z); tanpa ini server (UTC) membaca jam
+        // lokal perangkat sebagai UTC dan hasilnya bergeser 7 jam.
+        'clockIn': clockIn.toUtc().toIso8601String(),
+        'clockOut': clockOut.toUtc().toIso8601String(),
         'reason': reason,
       }),
     );

@@ -10,8 +10,8 @@ import 'auth_repository.dart';
 /// diikutinya, kontrak karyawan yang dikelolanya tersisa ≤ 30 hari).
 /// Aplikasi hanya membaca & menandai sudah dibaca.
 ///
-/// Catatan backend: [changes] di mock berbunyi langsung; di API nyata
-/// gunakan push (FCM / WebSocket) atau polling berkala.
+/// Catatan backend: [changes] berbunyi untuk perubahan lokal; untuk kejadian
+/// dari server gunakan push (FCM / WebSocket) atau polling berkala.
 abstract class NotificationRepository {
   Listenable get changes;
 

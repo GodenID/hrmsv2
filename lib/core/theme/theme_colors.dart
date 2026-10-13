@@ -13,8 +13,6 @@ extension ThemeColors on BuildContext {
   /// tetap kompilasi tanpa perubahan massal.
   bool get isDark => false;
 
-  ColorScheme get scheme => Theme.of(this).colorScheme;
-
   /// Latar permukaan.
   Color get surface => Colors.white;
 

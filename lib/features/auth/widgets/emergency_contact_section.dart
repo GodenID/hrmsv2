@@ -8,7 +8,7 @@ import '../../../core/widgets/form_widgets.dart';
 import '../../../core/widgets/panel.dart';
 import '../../../data/auth_repository.dart';
 import '../../../data/employee_repository.dart';
-import 'registration_widgets.dart';
+import 'form_subsection.dart';
 
 /// Kotak "Kontak darurat": nama, hubungan, nomor HP, plus tombol
 /// "Pilih dari kontak HP" (Android & iOS). Dipakai di pendaftaran dan di

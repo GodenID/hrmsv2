@@ -16,26 +16,14 @@ import '../data/auth_repository.dart';
 import '../data/employee_repository.dart';
 import '../data/event_repository.dart';
 import '../data/leave_repository.dart';
-import '../data/mock/mock_announcement_repository.dart';
-import '../data/mock/mock_attendance_repository.dart';
-import '../data/mock/mock_auth_repository.dart';
-import '../data/mock/mock_employee_repository.dart';
-import '../data/mock/mock_event_repository.dart';
-import '../data/mock/mock_leave_repository.dart';
-import '../data/mock/mock_notification_repository.dart';
-import '../data/mock/mock_overtime_repository.dart';
-import '../data/mock/mock_profile_repository.dart';
-import '../data/mock/mock_store.dart';
 import '../data/notification_repository.dart';
 import '../data/overtime_repository.dart';
 import '../data/profile_repository.dart';
 import '../data/warning_repository.dart';
-import '../data/mock/mock_warning_repository.dart';
 import 'platform_services.dart';
 import 'session_storage.dart';
 
 /// Semua dependency aplikasi di satu tempat.
-/// Ganti implementasi mock dengan implementasi API saat backend siap.
 class AppDependencies {
   const AppDependencies({
     required this.auth,
@@ -52,56 +40,9 @@ class AppDependencies {
     this.platform = const PlatformServices(),
   });
 
-  /// Semua repository mock berbagi satu [MockStore].
-  /// [latency] = null memakai jeda bawaan tiap repository.
-  /// [sessionStorage] bawaan: di memori (cocok untuk pengujian).
-  factory AppDependencies.mock({
-    Duration? latency,
-    MockStore? store,
-    SessionStorage? sessionStorage,
-    PlatformServices platform = const PlatformServices(),
-  }) {
-    final s = store ?? MockStore();
-    return AppDependencies(
-      auth: latency == null
-          ? MockAuthRepository(s)
-          : MockAuthRepository(s, latency: latency),
-      attendance: latency == null
-          ? MockAttendanceRepository(s)
-          : MockAttendanceRepository(s, latency: latency),
-      announcements: latency == null
-          ? MockAnnouncementRepository(s)
-          : MockAnnouncementRepository(s, latency: latency),
-      leave: latency == null
-          ? MockLeaveRepository(s)
-          : MockLeaveRepository(s, latency: latency),
-      overtime: latency == null
-          ? MockOvertimeRepository(s)
-          : MockOvertimeRepository(s, latency: latency),
-      events: latency == null
-          ? MockEventRepository(s)
-          : MockEventRepository(s, latency: latency),
-      profile: latency == null
-          ? MockProfileRepository(s)
-          : MockProfileRepository(s, latency: latency),
-      employees: latency == null
-          ? MockEmployeeRepository(s)
-          : MockEmployeeRepository(s, latency: latency),
-      notifications: latency == null
-          ? MockNotificationRepository(s)
-          : MockNotificationRepository(s, latency: latency),
-      warnings: latency == null
-          ? MockWarningRepository(s)
-          : MockWarningRepository(s, latency: latency),
-      sessionStorage: sessionStorage ?? MemorySessionStorage(),
-      platform: platform,
-    );
-  }
-
-  /// Mode API: seluruh repository ke server PostgreSQL + S3.
-  /// Dipakai saat `API_BASE_URL` diisi via --dart-define. DB produksi mulai
-  /// kosong (tanpa seed demo) — akun pertama yang daftar jadi superadmin.
-  /// [AppDependencies.mock] tersisa untuk pengujian saja.
+  /// Seluruh repository ke server PostgreSQL + S3.
+  /// `API_BASE_URL` diisi via --dart-define. DB produksi mulai kosong
+  /// (tanpa seed demo) — akun pertama yang daftar jadi superadmin.
   factory AppDependencies.api({
     required String baseUrl,
     SessionStorage? sessionStorage,

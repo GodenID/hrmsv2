@@ -5,9 +5,11 @@ import 'package:hrms_app/core/app_scope.dart';
 
 void main() {
   testWidgets('Halaman login tampil sebagai halaman awal', (tester) async {
+    // Tanpa token tersimpan, aplikasi langsung ke halaman login tanpa
+    // menghubungi server.
     await tester.pumpWidget(
       PrasastiConnectApp(
-        dependencies: AppDependencies.mock(latency: Duration.zero),
+        dependencies: AppDependencies.api(baseUrl: 'http://localhost:8080'),
       ),
     );
     await tester.pumpAndSettle();

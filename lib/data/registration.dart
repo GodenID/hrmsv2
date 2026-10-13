@@ -1,19 +1,5 @@
-import 'auth_repository.dart';
-
-/// Model & aturan pendaftaran akun mandiri (halaman "Daftar").
-///
-/// Server WAJIB:
-/// - selalu memberi role [UserRole.staff] pada akun hasil pendaftaran
-///   (tidak ada input role dari klien); hanya Super Admin yang kemudian
-///   menaikkan / menurunkan role lewat menu Karyawan,
-/// - memvalidasi ulang semua data di bawah (jangan percaya validasi klien),
-/// - menolak nomor HP yang sudah dipakai akun lain (bandingkan setelah
-///   dirapikan via [PhoneNumbers.canonical]; karena endpoint ini publik,
-///   pesannya tidak boleh menyebut pemilik nomor),
-/// - menolak pendaftaran tanpa persetujuan privasi dan mencatat kapan
-///   persetujuan diberikan (bukti consent UU PDP),
-/// - menyimpan password dalam bentuk hash (mis. argon2id / bcrypt),
-/// - membatasi laju (rate limit) & memakai CAPTCHA pada endpoint publik ini.
+// Model data diri karyawan & aturan validasinya.
+// Server menegakkan ulang semua aturan ini.
 
 enum Gender {
   male('Laki-laki'),
@@ -105,105 +91,12 @@ class EmergencyContact {
   final String phone;
 }
 
-/// Isi formulir pendaftaran. Sengaja tanpa role: role ditentukan server.
-class RegistrationDraft {
-  const RegistrationDraft({
-    required this.username,
-    required this.password,
-    required this.fullName,
-    required this.nik,
-    required this.birthPlace,
-    required this.birthDate,
-    required this.gender,
-    required this.address,
-    required this.email,
-    required this.phone,
-    required this.emergencyContact,
-    required this.division,
-    required this.employmentStatus,
-    this.contractMonths,
-    required this.privacyConsent,
-  });
-
-  final String username;
-  final String password;
-  final String fullName;
-  final String nik;
-
-  /// Tempat & tanggal lahir sesuai KTP.
-  final String birthPlace;
-  final DateTime birthDate;
-
-  final Gender gender;
-  final String address;
-  final String email;
-  final String phone;
-  final EmergencyContact emergencyContact;
-  final Division division;
-
-  /// Status kepegawaian pilihan pendaftar.
-  final EmploymentStatus employmentStatus;
-
-  /// Durasi (bulan) untuk status yang membutuhkannya; null untuk External
-  /// Relations.
-  final int? contractMonths;
-
-  /// Persetujuan pemrosesan data pribadi (UU PDP). Server wajib menolak
-  /// pendaftaran bila false dan mencatat waktu persetujuan bila true.
-  final bool privacyConsent;
-}
-
-/// Akun yang berhasil dibuat lewat pendaftaran.
-class RegisteredAccount {
-  const RegisteredAccount({
-    required this.username,
-    required this.fullName,
-    required this.role,
-    required this.division,
-    required this.employmentStatus,
-    this.contractMonths,
-  });
-
-  final String username;
-  final String fullName;
-  final UserRole role;
-  final Division division;
-  final EmploymentStatus employmentStatus;
-  final int? contractMonths;
-}
-
-/// Bagian formulir yang menyebabkan pendaftaran ditolak server, agar
-/// halaman bisa langsung membuka langkah yang perlu diperbaiki.
-enum RegistrationField {
-  username,
-  password,
-  fullName,
-  nik,
-  birthPlace,
-  birthDate,
-  address,
-  email,
-  phone,
-  emergencyContact,
-  employmentStatus,
-}
-
-class RegistrationException extends AuthException {
-  const RegistrationException(super.message, {this.field});
-
-  final RegistrationField? field;
-}
-
-/// Aturan validasi khusus pendaftaran (dipakai formulir & mock server).
+/// Aturan validasi data diri karyawan (dipakai formulir; server menegakkan ulang).
 /// Username, nama, NIK, email & telepon memakai `EmployeeRules`.
 abstract final class RegistrationRules {
   static const int addressMaxLength = 200;
 
   static const int birthPlaceMaxLength = 60;
-
-  /// Usia kerja minimum. Pendaftar wajib ber-NIK KTP, dan KTP diterbitkan
-  /// pada usia 17 tahun.
-  static const int minimumAgeYears = 17;
 
   static String? validateBirthPlace(String? value) {
     final v = value?.trim() ?? '';
@@ -214,67 +107,6 @@ abstract final class RegistrationRules {
     }
     return null;
   }
-
-  /// [now] bisa diisi waktu server agar deterministik di pengujian.
-  static String? validateBirthDate(DateTime? value, {DateTime? now}) {
-    if (value == null) return 'Pilih tanggal lahir';
-    final today = _dateOnly(now ?? DateTime.now());
-    final birth = _dateOnly(value);
-    if (birth.isAfter(today)) {
-      return 'Tanggal lahir tidak boleh di masa depan';
-    }
-    if (ageOn(birth, today) < minimumAgeYears) {
-      return 'Pendaftar minimal berusia $minimumAgeYears tahun';
-    }
-    return null;
-  }
-
-  static int ageOn(DateTime birth, DateTime on) {
-    var age = on.year - birth.year;
-    if (on.month < birth.month ||
-        (on.month == birth.month && on.day < birth.day)) {
-      age--;
-    }
-    return age;
-  }
-
-  /// Digit 7–12 NIK menyimpan tanggal lahir (DDMMYY; hari +40 untuk
-  /// perempuan). Bila tidak cocok dengan tanggal lahir isian, salah
-  /// satunya keliru. Tahun 2 digit diartikan ke abad yang tidak membuat
-  /// tanggal lahir jatuh di masa depan.
-  static String? birthDateMismatch(
-    DateTime birth,
-    String nik,
-    Gender gender, {
-    DateTime? now,
-  }) {
-    final digits = nik.replaceAll(RegExp(r'\D'), '');
-    // NIK yang tidak valid ditangani aturannya sendiri.
-    if (digits.length != 16) return null;
-    final day = int.tryParse(digits.substring(6, 8));
-    final month = int.tryParse(digits.substring(8, 10));
-    final yy = int.tryParse(digits.substring(10, 12));
-    if (day == null || month == null || yy == null) return null;
-    var nikDay = day;
-    if (gender == Gender.female) {
-      if (nikDay < 41 || nikDay > 71) {
-        return 'Tanggal lahir tidak sesuai dengan NIK. '
-            'Periksa kembali keduanya.';
-      }
-      nikDay -= 40;
-    }
-    final today = now ?? DateTime.now();
-    var year = 2000 + yy;
-    if (year > today.year) year -= 100;
-    final b = _dateOnly(birth);
-    if (nikDay != b.day || month != b.month || year != b.year) {
-      return 'Tanggal lahir tidak sesuai dengan NIK. '
-          'Periksa kembali keduanya.';
-    }
-    return null;
-  }
-
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
 
   /// Validasi isian durasi (bulan) untuk [status]. External Relations tidak
   /// memakai durasi sehingga selalu lolos.

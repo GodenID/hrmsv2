@@ -5,18 +5,15 @@ import 'package:http/http.dart' as http;
 import '../auth_repository.dart';
 
 /// Base URL API, diisi via `--dart-define=API_BASE_URL=https://api.domain`.
-/// Kosong = mode mock (pengembangan).
+/// Wajib diisi untuk build aplikasi (lihat `main.dart`).
 class ApiConfig {
   static const baseUrl = String.fromEnvironment(
     'API_BASE_URL',
     defaultValue: '',
   );
-
-  static bool get useApi => baseUrl.isNotEmpty;
 }
 
 /// [AuthRepository] yang bicara ke backend Shelf + PostgreSQL.
-/// Kontrak & pesan galat disamakan dengan mock agar halaman tidak berubah.
 class ApiAuthRepository implements AuthRepository {
   ApiAuthRepository({http.Client? client, String? baseUrl})
       : _client = client ?? http.Client(),
@@ -27,30 +24,13 @@ class ApiAuthRepository implements AuthRepository {
 
   Uri _u(String path) => Uri.parse('$_base$path');
 
-  Never _throw(Object body, int fallbackStatus) {
+  Never _throw(Object body, int status) {
     String msg = 'Terjadi kesalahan. Coba lagi.';
-    String? field;
-    int status = fallbackStatus;
     try {
       final m = body is String ? jsonDecode(body) : body;
-      if (m is Map) {
-        msg = (m['message'] ?? msg).toString();
-        field = m['field'] as String?;
-        if (m['status'] is int) status = m['status'] as int;
-      }
+      if (m is Map) msg = (m['message'] ?? msg).toString();
     } catch (_) {}
-    if (status == 422 || status == 409) {
-      throw RegistrationException(msg, field: _fieldOf(field));
-    }
     throw AuthException(msg);
-  }
-
-  RegistrationField? _fieldOf(String? f) {
-    if (f == null) return null;
-    for (final v in RegistrationField.values) {
-      if (v.name == f) return v;
-    }
-    return null;
   }
 
   Map<String, String> _h([String? token]) => {
@@ -142,66 +122,5 @@ class ApiAuthRepository implements AuthRepository {
       body: jsonEncode({'resetToken': resetToken, 'newPassword': newPassword}),
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
-  }
-
-  @override
-  Future<bool> isRegistrationOpen() async {
-    final res = await _client.get(_u('/auth/registration-open'), headers: _h());
-    if (res.statusCode != 200) return true;
-    final m = jsonDecode(res.body) as Map<String, dynamic>;
-    return (m['open'] as bool?) ?? true;
-  }
-
-  @override
-  Future<void> checkUsernameAvailable(String username) async {
-    final res = await _client.post(
-      _u('/auth/check-username'),
-      headers: _h(),
-      body: jsonEncode({'username': username}),
-    );
-    if (res.statusCode != 200) _throw(res.body, res.statusCode);
-  }
-
-  @override
-  Future<RegisteredAccount> register(RegistrationDraft d) async {
-    final res = await _client.post(
-      _u('/auth/register'),
-      headers: _h(),
-      body: jsonEncode({
-        'username': d.username,
-        'password': d.password,
-        'fullName': d.fullName,
-        'nik': d.nik,
-        'birthPlace': d.birthPlace,
-        'birthDate': d.birthDate.toIso8601String().substring(0, 10),
-        'gender': d.gender.name,
-        'address': d.address,
-        'email': d.email,
-        'phone': d.phone,
-        'emergencyName': d.emergencyContact.name,
-        'emergencyRelation': d.emergencyContact.relation.name,
-        'emergencyPhone': d.emergencyContact.phone,
-        'division': d.division.name,
-        'employmentStatus': d.employmentStatus.name,
-        'contractMonths': d.contractMonths,
-        'privacyConsent': d.privacyConsent,
-      }),
-    );
-    if (res.statusCode != 200 && res.statusCode != 201) {
-      _throw(res.body, res.statusCode);
-    }
-    final m = jsonDecode(res.body) as Map<String, dynamic>;
-    final um = (m['user'] ?? {}) as Map<String, dynamic>;
-    return RegisteredAccount(
-      username: (um['username'] ?? d.username).toString(),
-      fullName: (um['fullName'] ?? d.fullName).toString(),
-      role: UserRole.values.firstWhere(
-        (r) => r.name == (um['role'] ?? 'staff'),
-        orElse: () => UserRole.staff,
-      ),
-      division: d.division,
-      employmentStatus: d.employmentStatus,
-      contractMonths: d.contractMonths,
-    );
   }
 }

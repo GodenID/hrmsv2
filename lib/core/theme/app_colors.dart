@@ -64,5 +64,4 @@ abstract final class AppColors {
 
   /// Penanda lembur (titik/bintang di sel kalender & baris Excel).
   static const Color overtimeFlag = Color(0xFF2563EB);
-  static const Color overtimeFill = Color(0xFFDCE9FD);
 }

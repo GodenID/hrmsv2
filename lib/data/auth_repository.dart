@@ -1,12 +1,9 @@
 import 'app_exception.dart';
-import 'registration.dart';
 
 export 'app_exception.dart';
 export 'registration.dart';
 
-/// Kontrak autentikasi. Implementasi saat ini hanya mock (frontend saja);
-/// nanti cukup buat `ApiAuthRepository implements AuthRepository`
-/// tanpa mengubah halaman.
+/// Kontrak autentikasi (implementasi: `ApiAuthRepository`).
 abstract class AuthRepository {
   /// Mengembalikan sesi berisi token yang disimpan aplikasi agar pengguna
   /// tetap masuk setelah aplikasi dibuka ulang / web di-refresh.
@@ -56,22 +53,6 @@ abstract class AuthRepository {
     required String resetToken,
     required String newPassword,
   });
-
-  /// Apakah pendaftaran akun mandiri sedang dibuka (endpoint publik, tanpa
-  /// login). Halaman masuk menyembunyikan tombol "Daftar akun" bila false.
-  Future<bool> isRegistrationOpen();
-
-  /// Pendaftaran langkah 1: memastikan username valid & belum dipakai.
-  /// Melempar [RegistrationException] bila tidak tersedia atau pendaftaran
-  /// sedang ditutup.
-  Future<void> checkUsernameAvailable(String username);
-
-  /// Membuat akun dari pendaftaran mandiri. Akun selalu ber-role
-  /// [UserRole.staff]; perubahan role hanya oleh Super Admin.
-  /// Melempar [RegistrationException] (dengan `field` bila diketahui)
-  /// bila data ditolak, mis. NIK / email sudah terdaftar, atau pendaftaran
-  /// sedang ditutup.
-  Future<RegisteredAccount> register(RegistrationDraft draft);
 }
 
 /// Tiga role pengguna Prasasti Connect.
@@ -100,10 +81,6 @@ enum UserRole {
   bool get canManageEventThresholds =>
       this == UserRole.manager || this == UserRole.superadmin;
 
-  /// Melihat nilai PO event — kini terbuka semua role (keputusan produk).
-  /// Getter dipertahankan untuk kompatibilitas.
-  bool get canViewEventPo => true;
-
   /// Menyetujui / menolak cuti & koreksi absensi karyawan lain.
   bool get canReviewRequests =>
       this == UserRole.manager || this == UserRole.superadmin;
@@ -112,9 +89,6 @@ enum UserRole {
   /// password).
   bool get canManageEmployees =>
       this == UserRole.manager || this == UserRole.superadmin;
-
-  /// Membuka / menutup pendaftaran akun mandiri — hanya Super Admin.
-  bool get canManageRegistration => this == UserRole.superadmin;
 
   /// Mengatur lokasi & radius absen — hanya Super Admin.
   bool get canManageAttendanceLocations => this == UserRole.superadmin;
@@ -157,15 +131,6 @@ class AuthUser {
 
   /// Wajib onboarding (ganti password dan/atau lengkapi profil).
   bool get needsOnboarding => mustChangePassword || profileIncomplete;
-
-  /// Inisial untuk avatar, mis. "Budi Santoso" -> "BS".
-  String get initials {
-    final parts = fullName.trim().split(RegExp(r'\s+'));
-    if (parts.isEmpty || parts.first.isEmpty) return '?';
-    final first = parts.first[0];
-    final last = parts.length > 1 ? parts.last[0] : '';
-    return (first + last).toUpperCase();
-  }
 
   /// Nama depan untuk sapaan.
   String get firstName => fullName.trim().split(RegExp(r'\s+')).first;

@@ -66,11 +66,6 @@ abstract class EmployeeRepository {
   /// Mengganti password dengan password sementara baru (ditampilkan sekali
   /// ke Manager untuk diserahkan ke karyawan).
   Future<String> resetPassword(AuthUser actor, {required String username});
-
-  /// Membuka / menutup pendaftaran akun mandiri dari halaman masuk.
-  /// Hanya Super Admin ([UserRole.canManageRegistration]). Mengembalikan
-  /// status terbaru. Status dibaca lewat `AuthRepository.isRegistrationOpen`.
-  Future<bool> setRegistrationOpen(AuthUser actor, {required bool open});
 }
 
 /// Status kepegawaian memakai enum [EmploymentStatus] (di registration.dart,
@@ -231,7 +226,7 @@ class EmployeeCredential {
   final String temporaryPassword;
 }
 
-/// Aturan validasi yang sama dipakai di formulir & mock server.
+/// Aturan validasi yang sama dipakai di formulir; server menegakkan ulang.
 abstract final class EmployeeRules {
   static final RegExp username = RegExp(r'^[a-z][a-z0-9._]{2,29}$');
   static final RegExp nik = RegExp(r'^\d{16}$');

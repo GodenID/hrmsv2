@@ -13,7 +13,7 @@ import 'employee.dart';
 ///   naik dua tingkat sekaligus.
 ///
 /// Aturan masa berlaku mengikuti UU Ketenagakerjaan: tiap SP hidup
-/// [WarningRules.validityMonths] bulan sejak diterbitkan. Melanggar lagi
+/// 6 bulan sejak diterbitkan. Melanggar lagi
 /// saat SP masih aktif -> naik tingkat; setelah kedaluwarsa -> kembali
 /// ke SP 1. Bila SP 3 masih aktif lalu melanggar lagi, sistem menandai
 /// "memenuhi syarat PHK" (keputusan PHK tetap manusia, bukan otomatis).
@@ -168,10 +168,6 @@ class WarningLetter {
 
   bool isActive(DateTime now) => !voided && now.isBefore(expiresAt);
 
-  bool isExpiringSoon(DateTime now) =>
-      isActive(now) &&
-      expiresAt.difference(now).inDays <= WarningRules.expiryReminderDays;
-
   WarningLetter copyWith({
     DateTime? acknowledgedAt,
     String? acknowledgedBy,
@@ -235,22 +231,14 @@ class WarningSuggestion {
 }
 
 abstract final class WarningRules {
-  /// Masa berlaku tiap SP (bulan) sejak diterbitkan.
-  static const int validityMonths = 6;
-
-  /// Pengingat kedaluwarsa: H-hari sebelumnya.
-  static const int expiryReminderDays = 30;
-
   /// Kejadian maksimal berapa hari ke belakang yang boleh diterbitkan SP.
   static const int maxIncidentDaysBack = 90;
 
   static const int minDescription = 20;
   static const int maxDescription = 1000;
-  static const int minAppeal = 20;
   static const int maxAppeal = 1000;
   static const int minName = 3;
   static const int maxName = 120;
-  static const int maxArticle = 200;
   static const int minResponseNote = 10;
 
   static String? validateDescription(String value) {
@@ -260,17 +248,6 @@ abstract final class WarningRules {
     }
     if (v.length > maxDescription) {
       return 'Uraian maksimal $maxDescription karakter.';
-    }
-    return null;
-  }
-
-  static String? validateAppeal(String value) {
-    final v = value.trim();
-    if (v.length < minAppeal) {
-      return 'Sanggahan minimal $minAppeal karakter agar jelas duduk perkaranya.';
-    }
-    if (v.length > maxAppeal) {
-      return 'Sanggahan maksimal $maxAppeal karakter.';
     }
     return null;
   }

@@ -155,6 +155,8 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
   }
 
   Future<void> _openDay(AttendanceDay day) async {
+    // Tanggal mendatang tidak bisa dibuka/diajukan.
+    if (day.date.isAfter(_today)) return;
     final navigator = Navigator.of(context);
     final action = await showAttendanceDaySheet(context, day);
     if (!mounted) return;
@@ -308,8 +310,10 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
           ],
           const SizedBox(height: AppSpacing.md),
           Text(
-            'Ketuk tanggal untuk melihat jam clock in & clock out atau detail '
-            'cuti/izin/sakit. Jam masuk paling lambat '
+            'Ketuk tanggal yang sudah lewat untuk melihat jam clock in & clock '
+            'out, atau mengajukan absensi bila Anda lupa absen — termasuk di '
+            'hari libur. Tanggal mendatang tidak bisa diketuk. Jam masuk '
+            'paling lambat '
             '${WorkPolicy.latestOnTimeHour.toString().padLeft(2, '0')}.'
             '${WorkPolicy.latestOnTimeMinute.toString().padLeft(2, '0')}. '
             'Pengajuan yang masih menunggu ditandai berarsir.',
@@ -559,7 +563,7 @@ class _AttentionNote extends StatelessWidget {
           Expanded(
             child: Text(
               'Ada $count hari tanpa catatan lengkap (titik merah di '
-              'kalender). Ketuk tanggalnya lalu ajukan koreksi agar durasi '
+              'kalender). Ketuk tanggalnya lalu ajukan absensi agar durasi '
               'kerja Anda dihitung dengan benar.',
               style: Theme.of(context).textTheme.bodyMedium
                   ?.copyWith(color: context.warning, fontSize: 13.5),

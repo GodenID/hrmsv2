@@ -278,16 +278,4 @@ class ApiEmployeeRepository implements EmployeeRepository {
     final m = jsonDecode(res.body) as Map<String, dynamic>;
     return (m['temporaryPassword'] ?? '').toString();
   }
-
-  @override
-  Future<bool> setRegistrationOpen(AuthUser actor, {required bool open}) async {
-    final res = await _client.put(
-      Uri.parse('$_base/settings/registration'),
-      headers: await _h(),
-      body: jsonEncode({'open': open}),
-    );
-    if (res.statusCode != 200) _throw(res.body, res.statusCode);
-    final m = jsonDecode(res.body) as Map<String, dynamic>;
-    return (m['open'] as bool?) ?? open;
-  }
 }

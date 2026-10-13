@@ -29,7 +29,7 @@ class _LeaveDetailPageState extends State<LeaveDetailPage> {
   bool _isCancelling = false;
   bool _isOpening = false;
 
-  /// Buka surat dokter dari S3 (mode API). Mock tidak punya file beneran.
+  /// Buka surat dokter dari S3.
   Future<void> _openAttachment() async {
     final key = _request.attachment?.key;
     if (key == null || key.isEmpty || _isOpening) return;

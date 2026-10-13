@@ -80,13 +80,6 @@ abstract final class DateFormatId {
   static bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 
-  /// Contoh: "8j 05m" — ringkas untuk tabel.
-  static String durationCompact(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60);
-    return '${h}j ${_two(m)}m';
-  }
-
   /// Contoh: "Rabu, 7 Oktober 2026"
   static String longDate(DateTime d) {
     return '${_days[d.weekday - 1]}, ${d.day} ${_months[d.month - 1]} ${d.year}';

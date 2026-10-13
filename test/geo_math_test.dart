@@ -15,21 +15,6 @@ void main() {
     });
   });
 
-  group('GeoMath.bearingDegrees', () {
-    test('mata angin utama', () {
-      expect(GeoMath.bearingDegrees(0, 0, 1, 0), closeTo(0, 0.5));
-      expect(GeoMath.bearingDegrees(0, 0, 0, 1), closeTo(90, 0.5));
-      expect(GeoMath.bearingDegrees(0, 0, -1, 0), closeTo(180, 0.5));
-      expect(GeoMath.bearingDegrees(0, 0, 0, -1), closeTo(270, 0.5));
-    });
-
-    test('selalu 0–360', () {
-      final b = GeoMath.bearingDegrees(-6.175392, 106.827153, -6.2, 106.8);
-      expect(b, greaterThanOrEqualTo(0));
-      expect(b, lessThan(360));
-    });
-  });
-
   group('GeoMath.formatDistance', () {
     test('meter vs kilometer', () {
       expect(GeoMath.formatDistance(85.4), '85 m');

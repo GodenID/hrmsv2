@@ -130,9 +130,9 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
       if (!mounted) return;
       await showSuccessSheet(
         context,
-        title: 'Koreksi dikirim',
+        title: 'Pengajuan dikirim',
         message:
-            'Pengajuan koreksi ${DateFormatId.shortDate(date)} terkirim. '
+            'Pengajuan absensi ${DateFormatId.shortDate(date)} terkirim. '
             'Menunggu persetujuan Atasan.',
       );
       if (mounted) Navigator.of(context).pop(true);
@@ -157,8 +157,10 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
         '${d.clockIn == null ? '—' : DateFormatId.time(d.clockIn!)}  –  '
         '${d.clockOut == null ? '—' : DateFormatId.time(d.clockOut!)}';
 
+    final isMissing = d.clockIn == null && d.clockOut == null;
+
     return PageScaffold(
-      title: 'Ajukan koreksi',
+      title: isMissing ? 'Ajukan absensi' : 'Ajukan koreksi',
       maxWidth: 560,
       child: Form(
         key: _formKey,
@@ -262,7 +264,7 @@ class _CorrectionFormPageState extends State<CorrectionFormPage> {
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'Koreksi diperiksa oleh Atasan. Jika disetujui, jam di atas '
+              'Pengajuan diperiksa oleh Atasan. Jika disetujui, jam di atas '
               'menggantikan catatan absensi tanggal ini.',
               style: textTheme.bodySmall?.copyWith(height: 1.5),
             ),

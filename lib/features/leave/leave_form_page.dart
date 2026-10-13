@@ -139,8 +139,8 @@ class _LeaveFormPageState extends State<LeaveFormPage> {
     });    try {
       final file = await AppScope.of(context).platform.pickFile(
         allowedExtensions: LeaveAttachment.allowedExtensions,
-        // bytes dibutuhkan untuk upload S3 (mode API); mock abaikan.
-        withData: ApiConfig.baseUrl.isNotEmpty,
+        // bytes dibutuhkan untuk upload ke S3.
+        withData: true,
       );
       if (file == null || !mounted) return;
       final ext = file.extension ?? '';

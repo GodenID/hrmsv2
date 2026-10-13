@@ -78,7 +78,7 @@ class AnnouncementAttachment {
   final String name;
   final int sizeBytes;
 
-  /// Key objek di S3 (mode API). null = hanya metadata (mode mock).
+  /// Key objek di S3. null = hanya metadata.
   final String? key;
 
   String get sizeLabel {
@@ -89,7 +89,7 @@ class AnnouncementAttachment {
   }
 }
 
-/// Aturan pengumuman (dipakai formulir & mock server).
+/// Aturan pengumuman (dipakai formulir; server menegakkan ulang).
 abstract final class AnnouncementRules {
   static const int maxAttachments = 3;
   static const int maxBytes = 5 * 1024 * 1024;

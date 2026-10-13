@@ -85,38 +85,18 @@ karyawan, event, pengumuman, dan surat peringatan dalam satu genggaman.**
 └─────────────────────────────────────────────────┘
 ```
 
-| Mode | Cara | Data |
-|:---|:---|:---|
-| 🎨 **Mock** (UI/dev) | `flutter run` | Lokal di memori |
-| 🔌 **API** (produksi) | `--dart-define=API_BASE_URL=...` | PostgreSQL + S3 |
-
 ---
 
 ## 🚀 Mulai Cepat
 
-### 1️⃣ Aplikasi — mode mock (tanpa backend)
-
-```sh
-flutter pub get
-flutter run
-```
-
-🔑 **Akun demo** — password semua: `Prasasti@2026`
-
-| Username | Peran |
-|:---|:---|
-| `andi.pratama` | Super Admin |
-| `siti.rahma` | Manager |
-| `budi.santoso` | Staff |
-
-### 2️⃣ Backend — Postgres + API
+### 1️⃣ Backend — Postgres + API
 
 ```sh
 docker compose up --build
 curl http://localhost:8080/health   # → {"ok":true}
 ```
 
-### 3️⃣ Aplikasi melawan backend lokal
+### 2️⃣ Aplikasi melawan backend lokal
 
 ```sh
 flutter run --dart-define=API_BASE_URL=http://localhost:8080
@@ -134,7 +114,7 @@ flutter run --dart-define=API_BASE_URL=http://localhost:8080
 
 | Define | Wajib | Keterangan |
 |:---|:---:|:---|
-| `API_BASE_URL` | Tidak | Kosong = mode mock · Diisi = mode API, mis. `https://api.domain.id` |
+| `API_BASE_URL` | ✅ | URL server, mis. `https://api.domain.id` |
 
 </details>
 
@@ -194,7 +174,7 @@ Cadangkan `upload-keystore.jks` + `key.properties` — hilang = tak bisa update 
 
 ```sh
 flutter analyze          # harus bersih
-flutter test             # 157+ test, tanpa server
+flutter test             # tanpa server
 cd server && dart analyze # harus bersih
 ```
 

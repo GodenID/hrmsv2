@@ -122,12 +122,6 @@ class EventThresholds {
     required this.largeMax,
   });
 
-  static const EventThresholds defaults = EventThresholds(
-    smallMax: 50000000,
-    mediumMax: 200000000,
-    largeMax: 1000000000,
-  );
-
   final int smallMax;
   final int mediumMax;
   final int largeMax;
