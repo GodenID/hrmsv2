@@ -240,13 +240,15 @@ Router attendanceRouter(Db db, Config cfg) {
     }
   });
 
+  /// Wajib memakai [tx] milik pemanggil: membuka transaksi baru dari pool di
+  /// dalam transaksi lain membuat deadlock (pool hanya 1 koneksi) dan clock
+  /// in/out gagal timeout.
   Future<(Map<String, dynamic> loc, double dist)> requireInside(
-    double lat, double lng, bool mocked, double? accuracy) async {
+    TxSession tx, double lat, double lng, bool mocked, double? accuracy) async {
     if (mocked) {
       throw const _Http(400, 'Lokasi palsu terdeteksi. Matikan aplikasi pemalsu lokasi (mock location) lalu coba lagi.');
     }
-    final rows = await db.pool.runTx(
-        (tx) => tx.execute(Sql.named('SELECT * FROM attendance_locations')));
+    final rows = await tx.execute(Sql.named('SELECT * FROM attendance_locations'));
     if (rows.isEmpty) {
       throw const _Http(400, 'Belum ada lokasi absen yang diatur. Hubungi Super Admin.');
     }
@@ -350,7 +352,7 @@ Router attendanceRouter(Db db, Config cfg) {
         if (!isIn && eff.co != null) {
           throw const _Http(400, 'Anda sudah clock out hari ini.');
         }
-        final (loc, _) = await requireInside(lat, lng, mocked, acc);
+        final (loc, _) = await requireInside(tx, lat, lng, mocked, acc);
         Map<String, dynamic> saved;
         if (isIn) {
           final ins = await tx.execute(Sql.named('''
