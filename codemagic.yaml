@@ -1,0 +1,64 @@
+# Build iOS Prasasti Connect di Codemagic -> unggah otomatis ke TestFlight.
+#
+# Persiapan satu kali di Codemagic (https://codemagic.io):
+#   1. Add application -> pilih repo GitHub GodenID/hrmsv2 -> pilih
+#      "codemagic.yaml" sebagai konfigurasi.
+#   2. Teams -> Personal account -> Integrations -> App Store Connect:
+#      tambahkan API key (App Store Connect -> Users and Access ->
+#      Integrations -> App Store Connect API, role "App Manager"), beri nama
+#      integrasi persis "Prasasti Connect" (sama dengan nama di bawah).
+#   3. (Opsional, untuk push) Environment variables -> buat grup "ios_secrets",
+#      isi IOS_GOOGLE_SERVICE_INFO_B64 = GoogleService-Info.plist yang
+#      di-base64 (centang Secure), lalu tambahkan di bawah environment:
+#      groups: [ios_secrets].
+#
+# Bundle ID di bawah harus sama dengan App ID yang didaftarkan di Apple dan
+# aplikasi yang dibuat di App Store Connect.
+
+workflows:
+  ios-testflight:
+    name: iOS -> TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: Prasasti Connect
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+      vars:
+        BUNDLE_ID: "id.co.hrms.hrmsApp"
+        API_BASE_URL: "https://apihrms.prasastigroup.id"
+    scripts:
+      - name: Siapkan code signing otomatis
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles
+      - name: Pasang paket Flutter
+        script: |
+          flutter pub get
+      - name: Konfigurasi Firebase (opsional)
+        script: |
+          if [ -n "$IOS_GOOGLE_SERVICE_INFO_B64" ]; then
+            echo "$IOS_GOOGLE_SERVICE_INFO_B64" | base64 --decode > ios/Runner/GoogleService-Info.plist
+            echo "GoogleService-Info.plist dipasang."
+          else
+            echo "IOS_GOOGLE_SERVICE_INFO_B64 tidak diisi: push notification iOS nonaktif."
+          fi
+      - name: Build IPA
+        script: |
+          flutter build ipa --release \
+            --export-options-plist=/Users/builder/export_options.plist \
+            --build-number=$PROJECT_BUILD_NUMBER \
+            --dart-define=API_BASE_URL=$API_BASE_URL
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
