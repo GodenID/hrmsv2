@@ -12,6 +12,7 @@ import '../../core/widgets/page_scaffold.dart';
 import '../../core/widgets/picker_field.dart';
 import '../../data/auth_repository.dart';
 import '../../data/employee_repository.dart';
+import '../../data/master_data.dart';
 import 'widgets/temporary_password_dialog.dart';
 
 /// Tambah (tanpa [initial]) / ubah karyawan. Pop `true` bila tersimpan.
@@ -31,7 +32,6 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
   late final TextEditingController _fullName;
   late final TextEditingController _nik;
   late final TextEditingController _employeeId;
-  late final TextEditingController _position;
   late final TextEditingController _email;
   late final TextEditingController _phone;
   late final TextEditingController _address;
@@ -39,6 +39,7 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
   late final TextEditingController _ecPhone;
   Gender? _gender;
   Division? _division;
+  String? _position;
   EmergencyRelation? _ecRelation;
   bool _initialized = false;
 
@@ -51,13 +52,13 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
   late UserRole _role;
   EmploymentStatus? _employmentStatus;
   late final TextEditingController _contractMonths;
-  String? _manager;
   DateTime? _joinDate;
   String? _joinDateError;
 
-  /// Calon atasan (karyawan aktif), null selama dimuat.
-  List<EmployeeAccount>? _managerOptions;
-  String? _managerLoadError;
+  /// Master data untuk pilihan divisi & jabatan. null selama dimuat.
+  List<MasterDivision>? _divisions;
+  List<MasterPosition>? _positions;
+  String? _masterError;
 
   /// Email diisi otomatis dari username sampai pengguna mengetik sendiri.
   bool _emailTouched = false;
@@ -74,7 +75,7 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
     _fullName = TextEditingController(text: e?.fullName);
     _nik = TextEditingController(text: e?.nik);
     _employeeId = TextEditingController(text: e?.employeeId);
-    _position = TextEditingController(text: e?.position);
+    _position = e?.position;
     _division = e?.division;
     _email = TextEditingController(text: e?.email);
     _phone = TextEditingController(text: e?.phone);
@@ -87,7 +88,6 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
     _contractMonths = TextEditingController(
       text: e?.contractMonths?.toString(),
     );
-    _manager = e?.managerUsername;
     _joinDate = e?.joinDate;
     _emailTouched = _isEdit;
     if (!_isEdit) {
@@ -109,7 +109,7 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
     if (!_isEdit && !me.role.canManageRole(_role)) {
       _role = me.role.assignableRoles.first;
     }
-    _loadManagers();
+    _loadMaster();
   }
 
   @override
@@ -119,7 +119,6 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
       _fullName,
       _nik,
       _employeeId,
-      _position,
       _contractMonths,
       _email,
       _phone,
@@ -132,26 +131,54 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
     super.dispose();
   }
 
-  Future<void> _loadManagers() async {
-    setState(() => _managerLoadError = null);
+  Future<void> _loadMaster() async {
+    setState(() => _masterError = null);
     try {
-      final all = await AppScope.of(context).employees
-          .fetchEmployees(SessionScope.userOf(context));
+      final master = AppScope.of(context).master;
+      final me = SessionScope.userOf(context);
+      final divisions = await master.fetchDivisions(me);
+      final positions = await master.fetchPositions(me);
       if (!mounted) return;
-      final self = widget.initial?.username;
       setState(() {
-        _managerOptions = [
-          for (final e in all)
-            // Atasan saat ini tetap ditampilkan walau sudah nonaktif, agar
-            // formulir tidak kehilangan nilainya (server akan menolak).
-            if (e.username != self && (e.active || e.username == _manager)) e,
-        ];
+        _divisions = divisions;
+        _positions = positions;
       });
     } catch (_) {
       if (mounted) {
-        setState(() => _managerLoadError = 'Daftar atasan gagal dimuat.');
+        setState(
+          () => _masterError = 'Divisi & jabatan gagal dimuat.',
+        );
       }
     }
+  }
+
+  /// Pilihan divisi: yang aktif, ditambah divisi karyawan saat ini walau
+  /// sudah dinonaktifkan (agar data lama tetap bisa disimpan).
+  List<Division> get _divisionOptions {
+    final out = <Division>[];
+    for (final d in _divisions ?? const <MasterDivision>[]) {
+      if (!d.active && d.code != _division?.code) continue;
+      out.add(d.division);
+    }
+    final current = _division;
+    if (current != null && !out.any((d) => d.code == current.code)) {
+      out.add(current);
+    }
+    return out;
+  }
+
+  /// Pilihan jabatan: sama seperti divisi, jabatan lama tetap tersedia.
+  List<String> get _positionOptions {
+    final out = <String>[];
+    for (final p in _positions ?? const <MasterPosition>[]) {
+      if (!p.active && p.name != _position) continue;
+      out.add(p.name);
+    }
+    final current = _position;
+    if (current != null && current.isNotEmpty && !out.contains(current)) {
+      out.add(current);
+    }
+    return out;
   }
 
   Future<void> _pickJoinDate() async {
@@ -193,7 +220,7 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
       role: _role,
       nik: _nik.text,
       employeeId: _employeeId.text,
-      position: _position.text,
+      position: _position!,
       division: _division!,
       employmentStatus: _employmentStatus!,
       contractMonths: _employmentStatus!.requiresDuration
@@ -202,7 +229,6 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
       joinDate: _joinDate!,
       email: _email.text,
       phone: _phone.text,
-      managerUsername: _manager,
       gender: _gender,
       address: _address.text.trim().isEmpty ? null : _address.text.trim(),
       emergencyContact: _ecEmpty
@@ -386,17 +412,24 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
               _gap(),
               LabeledField(
                 label: 'Jabatan',
-                child: TextFormField(
-                  controller: _position,
-                  enabled: enabled,
-                  maxLength: 60,
-                  textCapitalization: TextCapitalization.words,
-                  textInputAction: TextInputAction.next,
-                  validator: (v) =>
-                      EmployeeRules.validateRequired(v, 'Jabatan'),
+                child: DropdownButtonFormField<String>(
+                  initialValue: _position,
+                  isExpanded: true,
+                  hint: Text(
+                    _positions == null ? 'Memuat jabatan…' : 'Pilih jabatan',
+                  ),
+                  items: [
+                    for (final p in _positionOptions)
+                      DropdownMenuItem(value: p, child: Text(p)),
+                  ],
+                  onChanged: enabled && _positions != null
+                      ? (v) => setState(() => _position = v)
+                      : null,
+                  validator: (v) => v == null ? 'Pilih jabatan' : null,
                   decoration: const InputDecoration(
-                    hintText: 'mis. Staf Operasional',
                     prefixIcon: Icon(Icons.work_outline, size: 20),
+                    helperText:
+                        'Daftar jabatan dikelola Super Admin di Master data.',
                   ),
                 ),
               ),
@@ -405,11 +438,15 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
                 label: 'Divisi',
                 child: DropdownButtonFormField<Division>(
                   initialValue: _division,
+                  isExpanded: true,
+                  hint: Text(
+                    _divisions == null ? 'Memuat divisi…' : 'Pilih divisi',
+                  ),
                   items: [
-                    for (final d in Division.values)
+                    for (final d in _divisionOptions)
                       DropdownMenuItem(value: d, child: Text(d.label)),
                   ],
-                  onChanged: enabled
+                  onChanged: enabled && _divisions != null
                       ? (d) => setState(() => _division = d)
                       : null,
                   validator: (d) => d == null ? 'Pilih divisi' : null,
@@ -418,6 +455,17 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
                   ),
                 ),
               ),
+              if (_masterError != null) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: _isSubmitting ? null : _loadMaster,
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: Text('$_masterError Ketuk untuk coba lagi.'),
+                  ),
+                ),
+              ],
               _gap(),
               LabeledField(
                 label: 'Status kepegawaian',
@@ -480,11 +528,6 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
                   enabled: enabled,
                   onTap: _pickJoinDate,
                 ),
-              ),
-              const SizedBox(height: AppSpacing.lg + 4),
-              LabeledField(
-                label: 'Atasan langsung (opsional)',
-                child: _buildManagerField(enabled),
               ),
               const SizedBox(height: AppSpacing.xl),
               _SectionTitle('Kontak'),
@@ -662,39 +705,6 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
             ],
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildManagerField(bool enabled) {
-    final options = _managerOptions;
-    if (options == null) {
-      return PickerField(
-        valueText: null,
-        hint: _managerLoadError ?? 'Memuat daftar atasan…',
-        icon: Icons.supervisor_account_outlined,
-        errorText: _managerLoadError == null ? null : 'Ketuk untuk coba lagi',
-        enabled: _managerLoadError != null,
-        onTap: _loadManagers,
-      );
-    }
-    return DropdownButtonFormField<String?>(
-      initialValue: _manager,
-      isExpanded: true,
-      items: [
-        const DropdownMenuItem<String?>(value: null, child: Text('Tidak ada')),
-        for (final e in options)
-          DropdownMenuItem<String?>(
-            value: e.username,
-            child: Text(
-              '${e.fullName} · ${e.position}${e.active ? '' : ' (nonaktif)'}',
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-      ],
-      onChanged: enabled ? (v) => setState(() => _manager = v) : null,
-      decoration: const InputDecoration(
-        prefixIcon: Icon(Icons.supervisor_account_outlined, size: 20),
       ),
     );
   }

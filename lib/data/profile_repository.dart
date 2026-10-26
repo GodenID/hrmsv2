@@ -96,7 +96,6 @@ class EmployeeProfile {
     required this.email,
     required this.phone,
     required this.nikMasked,
-    this.managerName,
     this.gender,
     this.birthPlace,
     this.birthDate,
@@ -119,7 +118,6 @@ class EmployeeProfile {
   /// NIK sudah disamarkan oleh server, mis. "3201 •••• •••• 0001".
   /// NIK lengkap sebaiknya tidak pernah dikirim ke aplikasi.
   final String nikMasked;
-  final String? managerName;
 
   /// null = belum diisi (mis. akun lama yang dibuat Manager).
   final Gender? gender;

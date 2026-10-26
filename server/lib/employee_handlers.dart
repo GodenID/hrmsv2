@@ -63,6 +63,7 @@ Map<String, dynamic> toAccount(
     'employeeId': a['employee_id'],
     'position': a['position'],
     'division': a['division'],
+    'divisionLabel': (a['division_label'] ?? a['division'])?.toString(),
     'employmentStatus': a['employment_status'],
     'contractMonths': a['contract_months'],
     'joinDate': (a['join_date'] as DateTime).toIso8601String().substring(0, 10),
@@ -70,7 +71,6 @@ Map<String, dynamic> toAccount(
     'phone': a['phone'],
     'nikMasked': maskNik((a['nik'] ?? '') as String),
     'nik': canEdit ? a['nik'] : null,
-    'managerUsername': a['manager_username'],
     'active': a['active'],
     'gender': a['gender'],
     'birthPlace': canEdit ? a['birth_place'] : null,
@@ -98,16 +98,62 @@ String? _photoUrl(S3Store? s3, bool avatarPublic, String? key) {
   return avatarPublic ? s3.publicUrl(key) : s3.presignGet(key);
 }
 
+/// Satu akun + label divisinya (dipakai setelah INSERT/UPDATE agar
+/// `RETURNING *` tidak perlu ikut join).
+Future<Map<String, dynamic>> accountRow(TxSession tx, String username) async {
+  final rows = await tx.execute(
+    Sql.named('''
+      SELECT u.*, d.label AS division_label
+      FROM users u LEFT JOIN divisions d ON d.code=u.division
+      WHERE u.username=@u
+    '''),
+    parameters: {'u': username},
+  );
+  return rows.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+}
+
 String? validateDraft(Map<String, dynamic> b) {
   String s(String k) => ((b[k] ?? '') as Object).toString();
   return validateFullName(s('fullName')) ??
       validateNik(s('nik')) ??
       (s('employeeId').trim().isEmpty ? 'ID karyawan wajib diisi' : null) ??
       (s('position').trim().length < 2 ? 'Jabatan wajib diisi' : null) ??
-      (!divisions.contains(s('division')) ? 'Divisi tidak dikenal.' : null) ??
+      (s('division').trim().isEmpty ? 'Divisi wajib diisi' : null) ??
       (!employmentStatuses.contains(s('employmentStatus')) ? 'Status kepegawaian tidak dikenal.' : null) ??
       validateEmail(s('email')) ??
       validatePhone(s('phone'));
+}
+
+/// Divisi & jabatan harus ada di master data. Nilai yang sudah dipakai
+/// karyawan tetap boleh dipertahankan walau sudah dinonaktifkan, agar
+/// penyuntingan data lama tidak gagal.
+Future<void> requireMaster(
+  TxSession tx, {
+  required String division,
+  required String position,
+  String? keepDivision,
+  String? keepPosition,
+}) async {
+  final div = await tx.execute(
+    Sql.named('SELECT active FROM divisions WHERE code=@c'),
+    parameters: {'c': division},
+  );
+  if (div.isEmpty) {
+    throw const _Http(422, 'Divisi tidak dikenal. Tambahkan dulu di Pengaturan.');
+  }
+  if (div.first.toColumnMap()['active'] != true && division != keepDivision) {
+    throw const _Http(422, 'Divisi sudah nonaktif. Pilih divisi lain.');
+  }
+  final pos = await tx.execute(
+    Sql.named('SELECT active FROM positions WHERE lower(btrim(name))=lower(btrim(@n))'),
+    parameters: {'n': position},
+  );
+  if (pos.isEmpty) {
+    throw const _Http(422, 'Jabatan tidak dikenal. Tambahkan dulu di Pengaturan.');
+  }
+  if (pos.first.toColumnMap()['active'] != true && position != keepPosition) {
+    throw const _Http(422, 'Jabatan sudah nonaktif. Pilih jabatan lain.');
+  }
 }
 
 Router employeeRouter(Db db, Config cfg) {
@@ -136,7 +182,11 @@ Router employeeRouter(Db db, Config cfg) {
     try {
       final actor = await requireManager(req);
       final rows = await db.pool.runTx((tx) => tx.execute(
-            Sql.named('SELECT * FROM users ORDER BY full_name'),
+            Sql.named('''
+              SELECT u.*, d.label AS division_label
+              FROM users u LEFT JOIN divisions d ON d.code=u.division
+              ORDER BY u.full_name
+            '''),
           ));
       final list = [
         for (final row in rows)
@@ -154,7 +204,11 @@ Router employeeRouter(Db db, Config cfg) {
     try {
       final actor = await requireManager(req);
       final rows = await db.pool.runTx((tx) => tx.execute(
-            Sql.named('SELECT * FROM users WHERE username=@u'),
+            Sql.named('''
+              SELECT u.*, d.label AS division_label
+              FROM users u LEFT JOIN divisions d ON d.code=u.division
+              WHERE u.username=@u
+            '''),
             parameters: {'u': username.trim().toLowerCase()},
           ));
       if (rows.isEmpty) return json({'message': 'Karyawan tidak ditemukan.'}, status: 404);
@@ -192,15 +246,20 @@ Router employeeRouter(Db db, Config cfg) {
           throw const _Http(409, 'Username sudah dipakai (termasuk akun nonaktif). Pilih yang lain.');
         }
         String s(String k) => ((b[k] ?? '') as Object).toString();
+        await requireMaster(
+          tx,
+          division: s('division'),
+          position: s('position').trim(),
+        );
         final ins = await tx.execute(Sql.named('''
           INSERT INTO users(username, full_name, role, nik, employee_id, position,
             division, employment_status, contract_months, join_date, email, phone,
-            password_hash, manager_username, gender, birth_place, birth_date,
+            password_hash, gender, birth_place, birth_date,
             address, emergency_name, emergency_relation, emergency_phone,
             must_change_password, profile_complete)
           VALUES(@u,@fn,@role,@nik,@eid,@pos,@div,@es,@cm,@jd,@em,@ph,
-            @pw,@mgr,@g,@bp,@bd,@ad,@en,@er,@ep,TRUE,FALSE)
-          RETURNING *
+            @pw,@g,@bp,@bd,@ad,@en,@er,@ep,TRUE,FALSE)
+          RETURNING username
         '''), parameters: {
           'u': name,
           'fn': s('fullName').trim(),
@@ -217,7 +276,6 @@ Router employeeRouter(Db db, Config cfg) {
           'em': s('email').trim().toLowerCase(),
           'ph': s('phone').trim(),
           'pw': BCrypt.hashpw(password, BCrypt.gensalt()),
-          'mgr': s('managerUsername').isEmpty ? null : s('managerUsername').trim().toLowerCase(),
           'g': s('gender').isEmpty ? null : s('gender'),
           'bp': s('birthPlace').isEmpty ? null : s('birthPlace').trim(),
           'bd': s('birthDate').isEmpty ? null : s('birthDate').substring(0, 10),
@@ -226,7 +284,7 @@ Router employeeRouter(Db db, Config cfg) {
           'er': s('emergencyRelation').isEmpty ? null : s('emergencyRelation'),
           'ep': s('emergencyPhone').isEmpty ? null : s('emergencyPhone').trim(),
         });
-        return ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        return accountRow(tx, ins.first.toColumnMap()['username'] as String);
       });
       return json(
         {'account': toAccount(created, actor, storeOf(cfg), cfg.s3avatarPublic), 'temporaryPassword': password},
@@ -268,8 +326,13 @@ Router employeeRouter(Db db, Config cfg) {
       final status = ((b['employmentStatus'] ?? 'contract') as String);
       final months = (b['contractMonths'] as num?)?.toInt();
 
-      if (!divisions.contains(division)) {
-        throw const _Http(422, 'Divisi tidak dikenal.');
+      final divRows = await db.pool.runTx((tx) => tx.execute(
+            Sql.named('SELECT active FROM divisions WHERE code=@c'),
+            parameters: {'c': division},
+          ));
+      if (divRows.isEmpty ||
+          divRows.first.toColumnMap()['active'] != true) {
+        throw const _Http(422, 'Divisi tidak dikenal atau sudah nonaktif.');
       }
       if (!employmentStatuses.contains(status)) {
         throw const _Http(422, 'Status kepegawaian tidak dikenal.');
@@ -429,13 +492,20 @@ Router employeeRouter(Db db, Config cfg) {
         if ((old['username'] as String) == actor['username'] && role != old['role']) {
           throw const _Http(403, 'Anda tidak dapat mengganti role akun Anda sendiri.');
         }
+        await requireMaster(
+          tx,
+          division: s('division'),
+          position: s('position').trim(),
+          keepDivision: (old['division'] ?? '').toString(),
+          keepPosition: (old['position'] ?? '').toString(),
+        );
         final upd = await tx.execute(Sql.named('''
           UPDATE users SET full_name=@fn, role=@role, nik=@nik, employee_id=@eid,
             position=@pos, division=@div, employment_status=@es, contract_months=@cm,
-            join_date=@jd, email=@em, phone=@ph, manager_username=@mgr, gender=@g,
+            join_date=@jd, email=@em, phone=@ph, gender=@g,
             birth_place=@bp, birth_date=@bd, address=@ad, emergency_name=@en,
             emergency_relation=@er, emergency_phone=@ep, updated_at=now()
-          WHERE username=@u RETURNING *
+          WHERE username=@u RETURNING username
         '''), parameters: {
           'u': (old['username'] as String),
           'fn': s('fullName').trim(),
@@ -451,7 +521,6 @@ Router employeeRouter(Db db, Config cfg) {
               : s('joinDate').substring(0, 10),
           'em': s('email').trim().toLowerCase(),
           'ph': s('phone').trim(),
-          'mgr': s('managerUsername').isEmpty ? null : s('managerUsername').trim().toLowerCase(),
           'g': s('gender').isEmpty ? null : s('gender'),
           'bp': s('birthPlace').isEmpty ? null : s('birthPlace').trim(),
           'bd': s('birthDate').isEmpty ? null : s('birthDate').substring(0, 10),
@@ -460,7 +529,7 @@ Router employeeRouter(Db db, Config cfg) {
           'er': s('emergencyRelation').isEmpty ? null : s('emergencyRelation'),
           'ep': s('emergencyPhone').isEmpty ? null : s('emergencyPhone').trim(),
         });
-        return upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        return accountRow(tx, upd.first.toColumnMap()['username'] as String);
       });
       return json(toAccount(updated, actor, storeOf(cfg), cfg.s3avatarPublic));
     } on _Http catch (h) {
@@ -487,7 +556,7 @@ Router employeeRouter(Db db, Config cfg) {
           throw _Http(403, '${actor['role']} tidak dapat mengubah status akun ${old['role']}.');
         }
         final upd = await tx.execute(
-          Sql.named('UPDATE users SET active=@a, updated_at=now() WHERE username=@u RETURNING *'),
+          Sql.named('UPDATE users SET active=@a, updated_at=now() WHERE username=@u RETURNING username'),
           parameters: {'a': active, 'u': (old['username'] as String)},
         );
         if (!active) {
@@ -495,7 +564,7 @@ Router employeeRouter(Db db, Config cfg) {
             'UPDATE sessions SET revoked_at=now() WHERE user_id=@i::uuid AND revoked_at IS NULL',
           ), parameters: {'i': (old['id'] as Object).toString()});
         }
-        return upd.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+        return accountRow(tx, upd.first.toColumnMap()['username'] as String);
       });
       return json(toAccount(updated, actor, storeOf(cfg), cfg.s3avatarPublic));
     } on _Http catch (h) {

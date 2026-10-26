@@ -19,7 +19,10 @@ void main() {
       role: UserRole.staff,
       employeeId: 'PG-0001',
       position: 'Staf',
-      division: Division.produksiPrasasti,
+      division: const Division(
+        code: 'produksiPrasasti',
+        label: 'Produksi Prasasti',
+      ),
       employmentStatus: EmploymentStatus.permanent,
       joinDate: DateTime(2024, 1, 2),
       email: '$username@prasasti.example',

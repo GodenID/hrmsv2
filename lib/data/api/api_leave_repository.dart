@@ -100,6 +100,30 @@ class ApiLeaveRepository implements LeaveRepository {
         pending: (m['pending'] as num?)?.toInt() ?? 0,
       );
 
+  LeaveQuota _quota(Map<String, dynamic> m) {
+    final emp = _map(m['employee']);
+    return LeaveQuota(
+      username: (emp['username'] ?? '').toString(),
+      fullName: (emp['fullName'] ?? '').toString(),
+      year: (m['year'] as num?)?.toInt() ?? DateTime.now().year,
+      baseQuota: (m['baseQuota'] as num?)?.toInt() ?? 12,
+      adjustment: (m['adjustment'] as num?)?.toInt() ?? 0,
+      quota: (m['quota'] as num?)?.toInt() ?? 12,
+      used: (m['used'] as num?)?.toInt() ?? 0,
+      pending: (m['pending'] as num?)?.toInt() ?? 0,
+      adjustments: [
+        for (final e in (m['adjustments'] as List? ?? []))
+          LeaveQuotaAdjustment(
+            id: (_map(e)['id'] ?? '').toString(),
+            days: (_map(e)['days'] as num?)?.toInt() ?? 0,
+            note: (_map(e)['note'] ?? '').toString(),
+            createdBy: (_map(e)['createdBy'] ?? '').toString(),
+            createdAt: _dt(_map(e)['createdAt']),
+          ),
+      ],
+    );
+  }
+
   LeaveReviewItem _item(Map<String, dynamic> m) => LeaveReviewItem(
         employee: EmployeeRef(
           username: ((_map(m['employee']))['username'] ?? '').toString(),
@@ -248,5 +272,58 @@ class ApiLeaveRepository implements LeaveRepository {
           ),
       ],
     );
+  }
+
+  @override
+  Future<LeaveQuota> fetchQuota(
+    AuthUser actor, {
+    required String username,
+    int? year,
+  }) async {
+    final uri = Uri.parse(
+      '$_base/leave/quota/${Uri.encodeComponent(username)}',
+    ).replace(queryParameters: year == null ? null : {'year': '$year'});
+    final res = await _client.get(uri, headers: await _h());
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    return _quota(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<LeaveQuota> adjustQuota(
+    AuthUser actor, {
+    required String username,
+    required int days,
+    required String note,
+    int? year,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/leave/quota/${Uri.encodeComponent(username)}'),
+      headers: await _h(),
+      body: jsonEncode({
+        'days': days,
+        'note': note,
+        'year': ?year,
+      }),
+    );
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      _throw(res.body, res.statusCode);
+    }
+    _ping();
+    return _quota(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> deleteQuotaAdjustment(
+    AuthUser actor, {
+    required String id,
+  }) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/leave/quota/adjustments/${Uri.encodeComponent(id)}'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200 && res.statusCode != 204) {
+      _throw(res.body, res.statusCode);
+    }
+    _ping();
   }
 }

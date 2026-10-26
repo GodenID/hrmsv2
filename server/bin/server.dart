@@ -10,6 +10,7 @@ import 'package:prasasti_server/attendance_handlers.dart';
 import 'package:prasasti_server/auth_handlers.dart';
 import 'package:prasasti_server/event_handlers.dart';
 import 'package:prasasti_server/leave_handlers.dart';
+import 'package:prasasti_server/master_handlers.dart';
 import 'package:prasasti_server/notify.dart' show PushBus;
 import 'package:prasasti_server/upload_handlers.dart';
 import 'package:prasasti_server/warning_handlers.dart';
@@ -68,6 +69,7 @@ Future<void> main() async {
   final ev = eventRouter(db, cfg);
   final warn = warningRouter(db, cfg);
   final appR = appRouter(db, cfg);
+  final master = masterRouter(db, cfg);
   final app = const Pipeline()
       .addMiddleware(logRequests())
       .addMiddleware(corsHeaders())
@@ -86,6 +88,7 @@ Future<void> main() async {
     if (p.startsWith('events')) return ev.call(req);
     if (p.startsWith('warnings')) return warn.call(req);
     if (p.startsWith('app/')) return appR.call(req);
+    if (p.startsWith('master/')) return master.call(req);
     return auth.call(req);
   });
 

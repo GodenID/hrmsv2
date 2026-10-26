@@ -377,7 +377,6 @@ class _ProfileBody extends StatelessWidget {
               InfoRow(label: 'ID karyawan', value: p.employeeId),
               InfoRow(label: 'Jabatan', value: p.position),
               InfoRow(label: 'Divisi', value: p.division.label),
-              InfoRow(label: 'Atasan langsung', value: p.managerName ?? '—'),
               InfoRow(
                 label: 'Status',
                 value: p.employmentStatus.displayLabel(p.contractMonths),

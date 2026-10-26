@@ -72,7 +72,7 @@ class ApiProfileRepository implements ProfileRepository {
       role: _enumOf(UserRole.values, m['role'], UserRole.staff),
       employeeId: (m['employeeId'] ?? '').toString(),
       position: (m['position'] ?? '').toString(),
-      division: _enumOf(Division.values, m['division'], Division.hrIt),
+      division: Division.fromJson(m['division'], m['divisionLabel']),
       employmentStatus: _enumOf(
         EmploymentStatus.values,
         m['employmentStatus'],
@@ -83,7 +83,6 @@ class ApiProfileRepository implements ProfileRepository {
       email: (m['email'] ?? '').toString(),
       phone: (m['phone'] ?? '').toString(),
       nikMasked: (m['nikMasked'] ?? '').toString(),
-      managerName: m['managerName'] as String?,
       gender: m['gender'] == null ? null : _enumOf(Gender.values, m['gender'], Gender.male),
       birthPlace: m['birthPlace'] as String?,
       birthDate: apiDateTimeOpt(m['birthDate']),

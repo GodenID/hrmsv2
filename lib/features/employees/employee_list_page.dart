@@ -11,6 +11,7 @@ import '../../core/widgets/role_badge.dart';
 import '../../core/widgets/segment_toggle.dart';
 import '../../data/auth_repository.dart';
 import '../../data/employee_repository.dart';
+import '../../data/master_data.dart';
 import '../shell/shell_routes.dart';
 
 /// Daftar karyawan (semua role dapat melihat) + pencarian.
@@ -24,6 +25,7 @@ class EmployeeListPage extends StatefulWidget {
 
 class _EmployeeListPageState extends State<EmployeeListPage> {
   late EmployeeRepository _repo;
+  late MasterDataRepository _master;
   bool _initialized = false;
   final _searchController = TextEditingController();
 
@@ -34,9 +36,8 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
   Division? _divisionFilter;
   UserRole? _roleFilter;
 
-  /// Hanya tampilkan staff aktif yang belum punya atasan langsung
-  /// (khas akun hasil daftar mandiri yang belum dilengkapi Super Admin).
-  bool _noManagerOnly = false;
+  /// Pilihan filter divisi dari master data.
+  List<MasterDivision>? _divisions;
 
   @override
   void didChangeDependencies() {
@@ -44,15 +45,19 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     if (_initialized) return;
     _initialized = true;
     _repo = AppScope.of(context).employees;
+    _master = AppScope.of(context).master;
     _repo.changes.addListener(_onChanged);
+    _master.changes.addListener(_onMasterChanged);
     AppRefresh.employees.addListener(_onChanged);
     _searchController.addListener(() => setState(() {}));
     _load();
+    _loadDivisions();
   }
 
   @override
   void dispose() {
     _repo.changes.removeListener(_onChanged);
+    _master.changes.removeListener(_onMasterChanged);
     AppRefresh.employees.removeListener(_onChanged);
     _searchController.dispose();
     super.dispose();
@@ -60,6 +65,31 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
 
   void _onChanged() {
     if (mounted) _load();
+  }
+
+  void _onMasterChanged() {
+    if (mounted) _loadDivisions();
+  }
+
+  Future<void> _loadDivisions() async {
+    try {
+      final list = await _master.fetchDivisions(SessionScope.userOf(context));
+      if (!mounted) return;
+      final choices = [
+        for (final d in list)
+          if (d.active) d.division,
+      ];
+      setState(() {
+        _divisions = list;
+        // Filter yang divisinya sudah dihapus/dinonaktifkan dibuang agar
+        // dropdown tidak memakai nilai yang tidak ada di daftar pilihan.
+        if (_divisionFilter != null && !choices.contains(_divisionFilter)) {
+          _divisionFilter = null;
+        }
+      });
+    } catch (_) {
+      // Filter divisi memakai daftar dari karyawan yang sudah dimuat.
+    }
   }
 
   Future<void> _load() async {
@@ -79,6 +109,25 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  /// Divisi untuk filter: master data bila tersedia, kalau gagal pakai
+  /// divisi yang muncul di daftar karyawan.
+  List<Division> get _divisionChoices {
+    final master = _divisions;
+    if (master != null) {
+      return [
+        for (final d in master)
+          if (d.active) d.division,
+      ];
+    }
+    final seen = <String, Division>{};
+    for (final e in _employees ?? const <EmployeeAccount>[]) {
+      seen[e.division.code] = e.division;
+    }
+    final out = seen.values.toList()
+      ..sort((a, b) => a.label.compareTo(b.label));
+    return out;
   }
 
   Future<void> _create() async {
@@ -116,7 +165,6 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
       return false;
     }
     if (_roleFilter != null && e.role != _roleFilter) return false;
-    if (_noManagerOnly && !isMissingManager(e)) return false;
     return true;
   }
 
@@ -174,14 +222,14 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
     final all = _employees!;
     final active = all.where((e) => e.active).toList();
     final inactive = all.where((e) => !e.active).toList();
-    final missingCount = active.where(isMissingManager).length;
     final q = _searchController.text.trim().toLowerCase();
     final isSuper =
         SessionScope.userOf(context).role == UserRole.superadmin;
     final shown = (_showInactive ? inactive : active)
         .where((e) => _matches(e, q))
         .toList();
-    final filtering = q.isNotEmpty || _noManagerOnly;
+    final filtering =
+        q.isNotEmpty || _divisionFilter != null || _roleFilter != null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -212,7 +260,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
                     value: null,
                     child: Text('Semua divisi'),
                   ),
-                  for (final d in Division.values)
+                  for (final d in _divisionChoices)
                     DropdownMenuItem<Division?>(
                       value: d,
                       child: Text(d.label),
@@ -257,21 +305,6 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
           selectedIndex: _showInactive ? 1 : 0,
           onSelect: (i) => setState(() => _showInactive = i == 1),
         ),
-        if (missingCount > 0 && !_showInactive) ...[
-          const SizedBox(height: AppSpacing.md),
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FilterChip(
-              label: Text('Belum ada atasan ($missingCount)'),
-              avatar: const Icon(
-                Icons.supervisor_account_outlined,
-                size: 18,
-              ),
-              selected: _noManagerOnly,
-              onSelected: (v) => setState(() => _noManagerOnly = v),
-            ),
-          ),
-        ],
         const SizedBox(height: AppSpacing.lg),
         if (shown.isEmpty)
           Panel(
@@ -312,11 +345,7 @@ class _EmployeeListPageState extends State<EmployeeListPage> {
   }
 }
 
-/// Staff aktif tanpa atasan langsung = belum dilengkapi (khas akun hasil
-/// daftar mandiri). Super Admin mengisinya lewat Ubah data karyawan.
-bool isMissingManager(EmployeeAccount e) =>
-    e.active && e.role == UserRole.staff && e.managerUsername == null;
-
+/// Baris daftar karyawan.
 class _EmployeeRow extends StatelessWidget {
   const _EmployeeRow({required this.employee, required this.onTap});
 
@@ -332,8 +361,7 @@ class _EmployeeRow extends StatelessWidget {
       button: true,
       label:
           '${e.fullName}, ${e.position}, ${e.division.label}. Role ${e.role.label}.'
-          '${e.active ? '' : ' Nonaktif.'}'
-          '${isMissingManager(e) ? ' Belum ada atasan.' : ''}',
+          '${e.active ? '' : ' Nonaktif.'}',
       excludeSemantics: true,
       child: InkWell(
         onTap: onTap,
@@ -376,27 +404,6 @@ class _EmployeeRow extends StatelessWidget {
                         fontFeatures: const [FontFeature.tabularFigures()],
                       ),
                     ),
-                    if (isMissingManager(e)) ...[
-                      const SizedBox(height: 3),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: context.warning.withValues(alpha: 0.14),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          'Belum ada atasan',
-                          style: textTheme.bodySmall?.copyWith(
-                            fontSize: 11,
-                            color: context.warning,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
                   ],
                 ),
               ),

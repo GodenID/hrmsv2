@@ -177,20 +177,20 @@ Router uploadRouter(Db db, Config cfg) {
   });
 
   // ---------- profil ----------
-  Map<String, dynamic> profileJson(Map<String, dynamic> a, String? managerName) => {
+  Map<String, dynamic> profileJson(Map<String, dynamic> a) => {
         'username': a['username'],
         'fullName': a['full_name'],
         'role': a['role'],
         'employeeId': a['employee_id'],
         'position': a['position'],
         'division': a['division'],
+        'divisionLabel': (a['division_label'] ?? a['division'])?.toString(),
         'employmentStatus': a['employment_status'],
         'contractMonths': a['contract_months'],
         'joinDate': (a['join_date'] as DateTime).toIso8601String().substring(0, 10),
         'email': a['email'],
         'phone': a['phone'],
         'nikMasked': _maskNik((a['nik'] ?? '') as String),
-        'managerName': managerName,
         'gender': a['gender'],
         'birthPlace': a['birth_place'],
         'birthDate': (a['birth_date'] as DateTime?)?.toIso8601String().substring(0, 10),
@@ -207,7 +207,11 @@ Router uploadRouter(Db db, Config cfg) {
 
   Future<Map<String, dynamic>> accountOf(TxSession tx, String userId) async {
     final rs = await tx.execute(
-        Sql.named('SELECT * FROM users WHERE id=@i::uuid'),
+        Sql.named('''
+          SELECT u.*, d.label AS division_label
+          FROM users u LEFT JOIN divisions d ON d.code=u.division
+          WHERE u.id=@i::uuid
+        '''),
         parameters: {'i': userId});
     return rs.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
   }
@@ -217,14 +221,7 @@ Router uploadRouter(Db db, Config cfg) {
       final u = await me(req);
       final row = await db.pool
           .runTx((tx) => accountOf(tx, (u['id'] as Object).toString()));
-      String? mgr;
-      if (row['manager_username'] != null) {
-        final m = await db.pool.runTx((tx) => tx.execute(Sql.named(
-              'SELECT full_name FROM users WHERE username=@u',
-            ), parameters: {'u': row['manager_username']}));
-        if (m.isNotEmpty) mgr = m.first.toColumnMap()['full_name'] as String?;
-      }
-      return json(profileJson(row, mgr));
+      return json(profileJson(row));
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }
@@ -462,14 +459,7 @@ Router uploadRouter(Db db, Config cfg) {
         });
         return accountOf(tx, (u['id'] as Object).toString());
       });
-      String? mgrName;
-      if (row['manager_username'] != null) {
-        final m = await db.pool.runTx((tx) => tx.execute(Sql.named(
-              'SELECT full_name FROM users WHERE username=@u',
-            ), parameters: {'u': row['manager_username']}));
-        if (m.isNotEmpty) mgrName = m.first.toColumnMap()['full_name'] as String?;
-      }
-      return json(profileJson(row, mgrName));
+      return json(profileJson(row));
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }

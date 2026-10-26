@@ -7,6 +7,7 @@ import '../data/api/api_auth_repository.dart';
 import '../data/api/api_employee_repository.dart';
 import '../data/api/api_event_repository.dart';
 import '../data/api/api_leave_repository.dart';
+import '../data/api/api_master_repository.dart';
 import '../data/api/api_notification_repository.dart';
 import '../data/api/api_overtime_repository.dart';
 import '../data/api/api_profile_repository.dart';
@@ -16,6 +17,7 @@ import '../data/auth_repository.dart';
 import '../data/employee_repository.dart';
 import '../data/event_repository.dart';
 import '../data/leave_repository.dart';
+import '../data/master_data.dart';
 import '../data/notification_repository.dart';
 import '../data/overtime_repository.dart';
 import '../data/profile_repository.dart';
@@ -35,6 +37,7 @@ class AppDependencies {
     required this.events,
     required this.profile,
     required this.employees,
+    required this.master,
     required this.notifications,
     required this.warnings,
     required this.updater,
@@ -66,6 +69,7 @@ class AppDependencies {
       events: ApiEventRepository(baseUrl: baseUrl, sessionStorage: store),
       profile: ApiProfileRepository(baseUrl: baseUrl, sessionStorage: store),
       employees: ApiEmployeeRepository(baseUrl: baseUrl, sessionStorage: store),
+      master: ApiMasterRepository(baseUrl: baseUrl, sessionStorage: store),
       notifications: ApiNotificationRepository(
         baseUrl: baseUrl,
         sessionStorage: store,
@@ -85,6 +89,7 @@ class AppDependencies {
   final EventRepository events;
   final ProfileRepository profile;
   final EmployeeRepository employees;
+  final MasterDataRepository master;
   final NotificationRepository notifications;
   final WarningRepository warnings;
   final AppUpdater updater;

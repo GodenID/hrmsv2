@@ -14,6 +14,7 @@ import '../../core/widgets/role_badge.dart';
 import '../../data/auth_repository.dart';
 import '../../data/employee_repository.dart';
 import '../shell/shell_routes.dart';
+import 'widgets/leave_quota_dialog.dart';
 import 'widgets/temporary_password_dialog.dart';
 
 /// Detail akun karyawan + aksi kelola (ubah, reset password,
@@ -79,6 +80,19 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
         .pushNamed<bool>(ShellRoutes.employeeForm, arguments: _employee);
     if (saved == true && mounted) {
       showAppSnackBar(context, 'Data karyawan diperbarui.');
+    }
+  }
+
+  Future<void> _openQuota() async {
+    final e = _employee;
+    final changed = await showLeaveQuotaDialog(
+      context,
+      username: e.username,
+      fullName: e.fullName,
+    );
+    if (changed && mounted) {
+      showAppSnackBar(context, 'Kuota cuti diperbarui.');
+      await _load();
     }
   }
 
@@ -331,10 +345,6 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
                   InfoRow(label: 'Jabatan', value: e.position),
                   InfoRow(label: 'Divisi', value: e.division.label),
                   InfoRow(
-                    label: 'Atasan langsung',
-                    value: e.managerName ?? '—',
-                  ),
-                  InfoRow(
                     label: 'Status',
                     value: e.employmentStatus.displayLabel(e.contractMonths),
                   ),
@@ -346,6 +356,36 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
               ),
             ),
             const SizedBox(height: AppSpacing.lg),
+            if (me.role == UserRole.superadmin) ...[
+              Panel(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const SectionLabel('Cuti tahunan'),
+                    Text(
+                      'Kurangi kuota cuti tahunan ${e.fullName} bila perlu '
+                      '(mis. sisa cuti tahun lalu yang hangus). Ini berbeda '
+                      'dari cuti bersama dan tidak bisa menambah kuota.',
+                      style: textTheme.bodySmall?.copyWith(height: 1.5),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        onPressed: _isBusy ? null : _openQuota,
+                        icon: const Icon(
+                          Icons.event_busy_outlined,
+                          size: 18,
+                        ),
+                        label: const Text('Atur kuota cuti'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
             Panel(
               padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
               child: Column(

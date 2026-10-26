@@ -34,8 +34,13 @@ class _Http implements Exception {
 Map<String, dynamic> annJson(
   Map<String, dynamic> a,
   List<Map<String, dynamic>> atts,
-) =>
-    {
+  Map<String, String> divisionLabels,
+) {
+  final codes = ((a['target_divisions'] ?? '') as String)
+      .split(',')
+      .where((s) => s.isNotEmpty)
+      .toList();
+  return {
       'id': (a['id'] as Object).toString(),
       'title': a['title'],
       'body': a['body'],
@@ -44,10 +49,10 @@ Map<String, dynamic> annJson(
       'updatedAt': isoUtcOpt(a['updated_at'] as DateTime?),
       'expiresAt': isoUtcOpt(a['expires_at'] as DateTime?),
       'pinned': a['pinned'],
-      'targetDivisions': ((a['target_divisions'] ?? '') as String)
-          .split(',')
-          .where((s) => s.isNotEmpty)
-          .toList(),
+      'targetDivisions': codes,
+      'targetDivisionLabels': [
+        for (final c in codes) divisionLabels[c] ?? c,
+      ],
       'attachments': [
         for (final t in atts)
           {
@@ -57,6 +62,7 @@ Map<String, dynamic> annJson(
           }
       ],
     };
+}
 
 Router announcementRouter(Db db, Config cfg) {
   final r = Router();
@@ -76,6 +82,18 @@ Router announcementRouter(Db db, Config cfg) {
       for (final row in rs)
         row.toColumnMap().map((k, v) => MapEntry(k.toString(), v))
     ];
+  }
+
+  /// Kode divisi -> label, supaya aplikasi tidak perlu memuat master data
+  /// hanya untuk menampilkan sasaran pengumuman.
+  Future<Map<String, String>> divisionLabels(TxSession tx) async {
+    final rs = await tx.execute(Sql.named('SELECT code, label FROM divisions'));
+    final out = <String, String>{};
+    for (final row in rs) {
+      final m = row.toColumnMap();
+      out[(m['code'] ?? '').toString()] = (m['label'] ?? '').toString();
+    }
+    return out;
   }
 
   bool visible(Map<String, dynamic> a, String division, DateTime now) {
@@ -129,6 +147,7 @@ Router announcementRouter(Db db, Config cfg) {
       final rows = await db.pool.runTx((tx) => tx.execute(
           Sql.named('SELECT * FROM announcements ORDER BY published_at DESC')));
       final items = <Map<String, dynamic>>[];
+      final labels = await db.pool.runTx(divisionLabels);
       for (final row in rows) {
         final a = row.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         if (!visible(a, (u['division'] ?? '') as String, now)) continue;
@@ -141,7 +160,7 @@ Router announcementRouter(Db db, Config cfg) {
         final vm = views.first.toColumnMap();
         items.add({
           'announcement':
-              annJson(a, await db.pool.runTx((tx) => attsFor(tx, (a['id'] as Object).toString()))),
+              annJson(a, await db.pool.runTx((tx) => attsFor(tx, (a['id'] as Object).toString())), labels),
           'viewedByMe': vm['me'] == true,
           'viewCount': int.parse((vm['c'] as Object).toString()),
         });
@@ -171,7 +190,7 @@ Router announcementRouter(Db db, Config cfg) {
           VALUES(@i::uuid, @u) ON CONFLICT DO NOTHING
         '''), parameters: {'i': id, 'u': u['username']});
         final m = cur.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
-        return annJson(m, await attsFor(tx, id));
+        return annJson(m, await attsFor(tx, id), await divisionLabels(tx));
       });
       return json(a);
     } on _Http catch (h) {
@@ -317,7 +336,7 @@ Router announcementRouter(Db db, Config cfg) {
     final fin = await tx.execute(Sql.named('SELECT * FROM announcements WHERE id=@i::uuid'),
         parameters: {'i': annId});
     final fm = fin.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
-    return annJson(fm, await attsFor(tx, annId));
+    return annJson(fm, await attsFor(tx, annId), await divisionLabels(tx));
   }
 
   r.post('/announcements', (Request req) async {

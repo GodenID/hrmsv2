@@ -90,8 +90,6 @@ class EmployeeAccount {
     required this.canChangeStatus,
     required this.canResetPassword,
     this.nik,
-    this.managerUsername,
-    this.managerName,
     this.gender,
     this.birthPlace,
     this.birthDate,
@@ -122,8 +120,6 @@ class EmployeeAccount {
 
   /// NIK lengkap — hanya dikirim server bila [canEdit] (dibutuhkan formulir).
   final String? nik;
-  final String? managerUsername;
-  final String? managerName;
   final bool active;
 
   /// Data pribadi (dari pendaftaran / diperbarui karyawan sendiri).
@@ -167,7 +163,6 @@ class EmployeeDraft {
     required this.joinDate,
     required this.email,
     required this.phone,
-    this.managerUsername,
     this.gender,
     this.address,
     this.emergencyContact,
@@ -184,7 +179,6 @@ class EmployeeDraft {
   final DateTime joinDate;
   final String email;
   final String phone;
-  final String? managerUsername;
 
   /// Data pribadi (opsional). null = kosong / dihapus.
   final Gender? gender;

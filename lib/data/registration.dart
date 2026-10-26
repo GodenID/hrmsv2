@@ -11,16 +11,38 @@ enum Gender {
 }
 
 /// Divisi di Prasasti Group.
-enum Division {
-  financeAccounting('Finance & Accounting'),
-  hrIt('HR & IT'),
-  businessDevelopment('Business Development'),
-  produksiPrasasti('Produksi Prasasti'),
-  produksiMutiari('Produksi Mutiari');
+///
+/// Daftar resmi kini berupa master data di server (dikelola Super Admin),
+/// jadi kelas ini hanya membawa kode + label. Kode bersifat tetap karena
+/// dipakai data karyawan dan penargetan pengumuman.
+class Division {
+  const Division({required this.code, required this.label});
 
-  const Division(this.label);
+  /// Kode unik (mis. `produksiPrasasti`).
+  final String code;
 
+  /// Nama tampilan (mis. `Produksi Prasasti`).
   final String label;
+
+  /// Dipakai bila server mengirim kode lama tanpa label.
+  static const Division unknown = Division(code: 'hrIt', label: 'HR & IT');
+
+  /// Membaca pasangan `division` + `divisionLabel` dari JSON.
+  factory Division.fromJson(Object? code, [Object? label]) {
+    final c = (code ?? '').toString();
+    if (c.isEmpty) return unknown;
+    final l = (label ?? '').toString();
+    return Division(code: c, label: l.isEmpty ? c : l);
+  }
+
+  @override
+  bool operator ==(Object other) => other is Division && other.code == code;
+
+  @override
+  int get hashCode => code.hashCode;
+
+  @override
+  String toString() => label;
 }
 
 /// Status kepegawaian — satu-satunya pilihan resmi (tidak ada status teks

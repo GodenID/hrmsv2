@@ -64,6 +64,28 @@ abstract class LeaveRepository {
     required DateTime end,
     required String reason,
   });
+
+  /// Kuota cuti tahunan satu karyawan beserta riwayat penyesuaiannya.
+  /// Hanya Super Admin. [year] null = tahun berjalan.
+  Future<LeaveQuota> fetchQuota(
+    AuthUser actor, {
+    required String username,
+    int? year,
+  });
+
+  /// Mengurangi kuota cuti tahunan satu karyawan (mis. sisa tahun lalu yang
+  /// hangus). [days] WAJIB negatif — tidak ada penambahan. [note] wajib.
+  /// Server menolak bila kuota menjadi di bawah cuti yang sudah terpakai.
+  Future<LeaveQuota> adjustQuota(
+    AuthUser actor, {
+    required String username,
+    required int days,
+    required String note,
+    int? year,
+  });
+
+  /// Membatalkan satu penyesuaian (koreksi salah input).
+  Future<void> deleteQuotaAdjustment(AuthUser actor, {required String id});
 }
 
 /// Hasil potong cuti bersama untuk satu karyawan.
@@ -210,6 +232,63 @@ class LeaveBalance {
 
   /// Yang masih bisa diajukan sekarang.
   int get available => (remaining - pending).clamp(0, quota);
+}
+
+/// Kuota cuti tahunan seorang karyawan pada satu tahun, termasuk riwayat
+/// penyesuaian yang dibuat Super Admin.
+class LeaveQuota {
+  const LeaveQuota({
+    required this.username,
+    required this.fullName,
+    required this.year,
+    required this.baseQuota,
+    required this.adjustment,
+    required this.quota,
+    required this.used,
+    required this.pending,
+    required this.adjustments,
+  });
+
+  final String username;
+  final String fullName;
+  final int year;
+
+  /// Kuota dasar dari aturan perusahaan (12 hari).
+  final int baseQuota;
+
+  /// Total penyesuaian (selalu negatif atau 0).
+  final int adjustment;
+
+  /// Kuota efektif = [baseQuota] + [adjustment].
+  final int quota;
+  final int used;
+  final int pending;
+  final List<LeaveQuotaAdjustment> adjustments;
+
+  int get remaining => (quota - used).clamp(0, quota);
+
+  int get available => (remaining - pending).clamp(0, quota);
+
+  /// Pengurangan maksimal yang masih boleh dilakukan tanpa membuat kuota
+  /// berada di bawah cuti yang sudah terpakai.
+  int get reducible => remaining;
+}
+
+/// Satu baris penyesuaian kuota (nilai [days] negatif = pengurangan).
+class LeaveQuotaAdjustment {
+  const LeaveQuotaAdjustment({
+    required this.id,
+    required this.days,
+    required this.note,
+    required this.createdBy,
+    required this.createdAt,
+  });
+
+  final String id;
+  final int days;
+  final String note;
+  final String createdBy;
+  final DateTime createdAt;
 }
 
 /// Aturan validasi cuti yang sama dipakai di formulir; server menegakkan ulang.

@@ -35,12 +35,33 @@ class _Http implements Exception {
 
 const annualQuota = 12;
 
-Future<({int used, int pending})> annualUsage(TxSession tx, String userId) async {
+/// Kuota tahunan efektif: dasar 12 hari dikurangi penyesuaian Super Admin
+/// untuk karyawan & tahun tersebut. Penyesuaian hanya boleh mengurangi.
+Future<int> annualQuotaFor(TxSession tx, String userId, int year) async {
+  final rs = await tx.execute(Sql.named('''
+    SELECT COALESCE(SUM(days),0) AS adj FROM leave_quota_adjustments
+    WHERE user_id=@i::uuid AND year=@y
+  '''), parameters: {'i': userId, 'y': year});
+  final adj = (rs.first.toColumnMap()['adj'] as num).toInt();
+  return (annualQuota + adj).clamp(0, annualQuota);
+}
+
+/// Pemakaian cuti tahunan pada satu tahun (berdasarkan tanggal mulai).
+Future<({int used, int pending})> annualUsage(
+  TxSession tx,
+  String userId,
+  int year,
+) async {
   final rs = await tx.execute(Sql.named('''
     SELECT status, COALESCE(SUM(working_days),0) AS d FROM leave_requests
     WHERE user_id=@i::uuid AND type='annual' AND status IN ('approved','pending')
+      AND start_date >= @s AND start_date < @e
     GROUP BY status
-  '''), parameters: {'i': userId});
+  '''), parameters: {
+    'i': userId,
+    's': '$year-01-01',
+    'e': '${year + 1}-01-01',
+  });
   var used = 0, pending = 0;
   for (final row in rs) {
     final m = row.toColumnMap();
@@ -51,6 +72,17 @@ Future<({int used, int pending})> annualUsage(TxSession tx, String userId) async
     }
   }
   return (used: used, pending: pending);
+}
+
+/// Kuota + pemakaian satu karyawan pada satu tahun.
+Future<({int quota, int used, int pending})> annualBalance(
+  TxSession tx,
+  String userId,
+  int year,
+) async {
+  final use = await annualUsage(tx, userId, year);
+  final quota = await annualQuotaFor(tx, userId, year);
+  return (quota: quota, used: use.used, pending: use.pending);
 }
 
 Map<String, dynamic> leaveJson(Map<String, dynamic> r) => {
@@ -107,15 +139,16 @@ Router leaveRouter(Db db, Config cfg) {
   r.get('/leave/balance', (Request req) async {
     try {
       final u = await me(req);
-      final use = await db.pool.runTx(
-          (tx) => annualUsage(tx, (u['id'] as Object).toString()));
-      final remaining = (annualQuota - use.used).clamp(0, annualQuota);
-      final available = (remaining - use.pending).clamp(0, annualQuota);
+      final year = nowWib().year;
+      final b = await db.pool.runTx((tx) =>
+          annualBalance(tx, (u['id'] as Object).toString(), year));
+      final remaining = (b.quota - b.used).clamp(0, b.quota);
+      final available = (remaining - b.pending).clamp(0, b.quota);
       return json({
-        'year': nowWib().year,
-        'quota': annualQuota,
-        'used': use.used,
-        'pending': use.pending,
+        'year': year,
+        'quota': b.quota,
+        'used': b.used,
+        'pending': b.pending,
         'remaining': remaining,
         'available': available,
       });
@@ -219,9 +252,11 @@ Router leaveRouter(Db db, Config cfg) {
 
       final created = await db.pool.runTx((tx) async {
         if (type == 'annual') {
-          final use = await annualUsage(tx, (u['id'] as Object).toString());
-          final avail = ((annualQuota - use.used).clamp(0, annualQuota) - use.pending)
-              .clamp(0, annualQuota);
+          final year = nowWib().year;
+          final b2 = await annualBalance(tx, (u['id'] as Object).toString(), year);
+          final avail =
+              ((b2.quota - b2.used).clamp(0, b2.quota) - b2.pending)
+                  .clamp(0, b2.quota);
           if (days > avail) {
             throw _Http(422, 'Sisa cuti tahunan yang bisa diajukan $avail hari.');
           }
@@ -317,16 +352,17 @@ Router leaveRouter(Db db, Config cfg) {
         if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
           continue;
         }
-        final use = await db.pool.runTx(
-            (tx) => annualUsage(tx, (m['user_id'] as Object).toString()));
+        final year = nowWib().year;
+        final bal = await db.pool.runTx((tx) =>
+            annualBalance(tx, (m['user_id'] as Object).toString(), year));
         final item = {
           'employee': {'username': m['username'], 'fullName': m['efn']},
           'request': leaveJson(m),
           'balance': {
-            'year': nowWib().year,
-            'quota': annualQuota,
-            'used': use.used,
-            'pending': use.pending,
+            'year': year,
+            'quota': bal.quota,
+            'used': bal.used,
+            'pending': bal.pending,
           },
         };
         ((m['status'] == 'pending' ? pending : done)).add(item);
@@ -370,9 +406,11 @@ Router leaveRouter(Db db, Config cfg) {
         if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
           throw const _Http(403, 'Anda tidak berhak memproses pengajuan karyawan ini.');
         }
+        final year = nowWib().year;
         if (approve && m['type'] == 'annual') {
-          final use = await annualUsage(tx, (m['user_id'] as Object).toString());
-          final remain = (annualQuota - use.used).clamp(0, annualQuota);
+          final bal = await annualBalance(
+              tx, (m['user_id'] as Object).toString(), year);
+          final remain = (bal.quota - bal.used).clamp(0, bal.quota);
           if ((m['working_days'] as int) > remain) {
             throw _Http(400,
                 'Sisa cuti tahunan ${m['efn']} tinggal $remain hari, tidak cukup untuk ${m['working_days']} hari.');
@@ -400,15 +438,16 @@ Router leaveRouter(Db db, Config cfg) {
             refType: 'leave',
             refId: id);
         }
-        final use = await annualUsage(tx, (m['user_id'] as Object).toString());
+        final bal = await annualBalance(
+            tx, (m['user_id'] as Object).toString(), year);
         return {
           'employee': {'username': m['username'], 'fullName': m['efn']},
           'request': leaveJson(rm),
           'balance': {
-            'year': nowWib().year,
-            'quota': annualQuota,
-            'used': use.used,
-            'pending': use.pending,
+            'year': year,
+            'quota': bal.quota,
+            'used': bal.used,
+            'pending': bal.pending,
           },
         };
       });
@@ -503,8 +542,10 @@ Router leaveRouter(Db db, Config cfg) {
             'r': reason,
             'b': actor['full_name'],
           });
-          final use = await annualUsage(tx, (a['id'] as Object).toString());
-          final remain = (annualQuota - use.used).clamp(0, annualQuota);
+          final year = dateOnly(s).year;
+          final bal = await annualBalance(
+              tx, (a['id'] as Object).toString(), year);
+          final remain = (bal.quota - bal.used).clamp(0, bal.quota);
           await notifyTx(tx, a['username'] as String,
               kind: 'collectiveLeaveApplied',
               title: 'Cuti bersama: $effective hari terpotong',
@@ -518,6 +559,170 @@ Router leaveRouter(Db db, Config cfg) {
         results.add(item);
       }
       return json({'results': results});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  // ---------- kuota cuti per karyawan (Super Admin) ----------
+  //
+  // Berbeda dari cuti bersama: penyesuaian ini menyasar satu karyawan dan
+  // hanya boleh MENGURANGI kuota tahunannya (mis. sisa cuti tahun lalu yang
+  // sudah hangus, atau sanksi administratif).
+  Future<Map<String, dynamic>?> targetOf(TxSession tx, String username) async {
+    final rows = await tx.execute(
+      Sql.named('SELECT * FROM users WHERE username=@u'),
+      parameters: {'u': username.trim().toLowerCase()},
+    );
+    return rows.isEmpty ? null : rows.first.toColumnMap().map(
+          (k, v) => MapEntry(k.toString(), v),
+        );
+  }
+
+  Future<Map<String, dynamic>> quotaPayload(
+    TxSession tx,
+    Map<String, dynamic> target,
+    int year,
+  ) async {
+    final id = (target['id'] as Object).toString();
+    final bal = await annualBalance(tx, id, year);
+    final remain = (bal.quota - bal.used).clamp(0, bal.quota);
+    final rows = await tx.execute(Sql.named('''
+      SELECT id, days, note, created_by, created_at
+      FROM leave_quota_adjustments
+      WHERE user_id=@i::uuid AND year=@y
+      ORDER BY created_at DESC
+    '''), parameters: {'i': id, 'y': year});
+    return {
+      'employee': {
+        'username': target['username'],
+        'fullName': target['full_name'],
+      },
+      'year': year,
+      'baseQuota': annualQuota,
+      'adjustment': bal.quota - annualQuota,
+      'quota': bal.quota,
+      'used': bal.used,
+      'pending': bal.pending,
+      'remaining': remain,
+      'available': (remain - bal.pending).clamp(0, bal.quota),
+      'adjustments': [
+        for (final row in rows)
+          {
+            'id': (row.toColumnMap()['id'] as Object).toString(),
+            'days': (row.toColumnMap()['days'] as num).toInt(),
+            'note': (row.toColumnMap()['note'] ?? '').toString(),
+            'createdBy': (row.toColumnMap()['created_by'] ?? '').toString(),
+            'createdAt':
+                isoUtc(row.toColumnMap()['created_at'] as DateTime),
+          },
+      ],
+    };
+  }
+
+  Future<Map<String, dynamic>> requireSuperadmin(Request req) async {
+    final actor = await me(req);
+    if (actor['role'] != 'superadmin') {
+      throw const _Http(
+          403, 'Hanya Super Admin yang dapat menyesuaikan kuota cuti.');
+    }
+    return actor;
+  }
+
+  int yearOf(Request req, [Map<String, dynamic>? body]) {
+    final raw = (body?['year'] ?? req.url.queryParameters['year'] ?? '')
+        .toString()
+        .trim();
+    final year = raw.isEmpty ? nowWib().year : int.tryParse(raw);
+    if (year == null || year < 2000 || year > 2100) {
+      throw const _Http(422, 'Tahun tidak valid.');
+    }
+    return year;
+  }
+
+  r.get('/leave/quota/<username>', (Request req, String username) async {
+    try {
+      await requireSuperadmin(req);
+      final year = yearOf(req);
+      final payload = await db.pool.runTx((tx) async {
+        final target = await targetOf(tx, username);
+        if (target == null) throw const _Http(404, 'Karyawan tidak ditemukan.');
+        return quotaPayload(tx, target, year);
+      });
+      return json(payload);
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.post('/leave/quota/<username>', (Request req, String username) async {
+    try {
+      final actor = await requireSuperadmin(req);
+      final b = await readJson(req);
+      final year = yearOf(req, b);
+      final days = (b['days'] as num?)?.toInt();
+      final note = ((b['note'] ?? '') as Object).toString().trim();
+      if (days == null || days >= 0) {
+        throw const _Http(422, 'Penyesuaian hanya boleh mengurangi (angka negatif).');
+      }
+      if (days < -365) {
+        throw const _Http(422, 'Pengurangan maksimal 365 hari.');
+      }
+      if (note.length < 5) {
+        throw const _Http(422, 'Tulis alasan minimal 5 karakter.');
+      }
+      if (note.length > 300) {
+        throw const _Http(422, 'Alasan maksimal 300 karakter.');
+      }
+      final payload = await db.pool.runTx((tx) async {
+        final target = await targetOf(tx, username);
+        if (target == null) throw const _Http(404, 'Karyawan tidak ditemukan.');
+        final id = (target['id'] as Object).toString();
+        final bal = await annualBalance(tx, id, year);
+        final next = bal.quota + days;
+        if (next < 0) {
+          throw _Http(422,
+              'Kuota tidak boleh negatif. Kuota saat ini ${bal.quota} hari.');
+        }
+        if (next < bal.used) {
+          throw _Http(422,
+              'Kuota tidak boleh di bawah cuti terpakai (${bal.used} hari).');
+        }
+        await tx.execute(Sql.named('''
+          INSERT INTO leave_quota_adjustments(user_id, year, days, note, created_by)
+          VALUES(@i::uuid, @y, @d, @n, @by)
+        '''), parameters: {
+          'i': id,
+          'y': year,
+          'd': days,
+          'n': note,
+          'by': (actor['username'] ?? '').toString(),
+        });
+        return quotaPayload(tx, target, year);
+      });
+      return json(payload, status: 201);
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.delete('/leave/quota/adjustments/<id>',
+      (Request req, String id) async {
+    try {
+      await requireSuperadmin(req);
+      if (!RegExp(r'^[0-9a-fA-F-]{36}$').hasMatch(id)) {
+        throw const _Http(404, 'Penyesuaian tidak ditemukan.');
+      }
+      await db.pool.runTx((tx) async {
+        final rows = await tx.execute(
+          Sql.named('DELETE FROM leave_quota_adjustments WHERE id=@i::uuid RETURNING id'),
+          parameters: {'i': id},
+        );
+        if (rows.isEmpty) {
+          throw const _Http(404, 'Penyesuaian tidak ditemukan.');
+        }
+      });
+      return json({'ok': true});
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }

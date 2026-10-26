@@ -103,7 +103,14 @@ Router authRouter(Db db, Config cfg) {
     if ((s('privacyConsent').toLowerCase() != 'true') && b['privacyConsent'] != true) {
       return json({'message': 'Centang persetujuan pemrosesan data pribadi untuk melanjutkan pendaftaran.'}, status: 422);
     }
-    if (!divisions.contains(s('division'))) {
+    final divOk = await db.pool.runTx((tx) async {
+      final rs = await tx.execute(
+        Sql.named('SELECT 1 FROM divisions WHERE code=@c AND active'),
+        parameters: {'c': s('division')},
+      );
+      return rs.isNotEmpty;
+    });
+    if (!divOk) {
       return json({'message': 'Divisi tidak dikenal.'}, status: 422);
     }
     if (!employmentStatuses.contains(s('employmentStatus'))) {

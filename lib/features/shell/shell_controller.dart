@@ -13,6 +13,7 @@ enum ShellTab {
   reports,
   warnings,
   broadcast,
+  masterData,
 }
 
 /// Aksi navigasi tingkat shell yang bisa dipanggil dari halaman mana pun

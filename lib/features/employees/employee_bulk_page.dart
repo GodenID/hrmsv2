@@ -12,6 +12,7 @@ import '../../../core/widgets/page_scaffold.dart';
 import '../../../core/widgets/panel.dart';
 import '../../../data/auth_repository.dart';
 import '../../../data/employee_repository.dart';
+import '../../../data/master_data.dart';
 
 /// Buat banyak akun sekaligus (Super Admin). Username & password acak,
 /// tampil SEKALI untuk dibagikan. Karyawan wajib ganti password + lengkapi
@@ -29,13 +30,42 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
   final _linesController = TextEditingController();
 
   UserRole _role = UserRole.staff;
-  Division _division = Division.produksiPrasasti;
+  Division? _division;
+  List<MasterDivision>? _divisions;
+  bool _initialized = false;
   EmploymentStatus _status = EmploymentStatus.contract;
   final _monthsController = TextEditingController(text: '12');
 
   bool _saving = false;
   String? _error;
   List<EmployeeCredential>? _result;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_initialized) return;
+    _initialized = true;
+    _loadDivisions();
+  }
+
+  Future<void> _loadDivisions() async {
+    try {
+      final list = await AppScope.of(context).master.fetchDivisions(
+            SessionScope.userOf(context),
+          );
+      if (!mounted) return;
+      setState(() {
+        _divisions = list;
+        final active = [for (final d in list) if (d.active) d.division];
+        if (_division == null && active.isNotEmpty) _division = active.first;
+        _error = null;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Daftar divisi gagal dimuat. Coba lagi.');
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -68,7 +98,7 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
                 ? int.parse(_countController.text.trim())
                 : null,
             role: _role,
-            division: _division,
+            division: _division!,
             employmentStatus: _status,
             contractMonths: _status.requiresDuration
                 ? int.parse(_monthsController.text.trim())
@@ -236,17 +266,38 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
                   const SizedBox(height: AppSpacing.md),
                   DropdownButtonFormField<Division>(
                     initialValue: _division,
+                    isExpanded: true,
+                    hint: Text(
+                      _divisions == null ? 'Memuat divisi…' : 'Pilih divisi',
+                    ),
                     items: [
-                      for (final d in Division.values)
-                        DropdownMenuItem(value: d, child: Text(d.label)),
+                      for (final d in _divisions ?? const <MasterDivision>[])
+                        if (d.active)
+                          DropdownMenuItem(
+                            value: d.division,
+                            child: Text(d.label),
+                          ),
                     ],
-                    onChanged: (d) =>
-                        setState(() => _division = d ?? _division),
+                    onChanged: _divisions == null
+                        ? null
+                        : (d) => setState(() => _division = d),
+                    validator: (d) => d == null ? 'Pilih divisi' : null,
                     decoration: const InputDecoration(
                       labelText: 'Divisi',
                       prefixIcon: Icon(Icons.apartment_outlined, size: 20),
                     ),
                   ),
+                  if (_divisions == null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        onPressed: _loadDivisions,
+                        icon: const Icon(Icons.refresh, size: 18),
+                        label: const Text('Muat daftar divisi'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: AppSpacing.md),
                   DropdownButtonFormField<EmploymentStatus>(
                     initialValue: _status,

@@ -50,11 +50,13 @@ class ApiAnnouncementRepository implements AnnouncementRepository {
         photoUrl: m['photoUrl'] as String?,
       );
 
-  Division _div(Object? v) {
-    for (final d in Division.values) {
-      if (d.name == v) return d;
-    }
-    return Division.hrIt;
+  List<Division> _targets(Map<String, dynamic> m) {
+    final codes = (m['targetDivisions'] as List? ?? const []);
+    final labels = (m['targetDivisionLabels'] as List? ?? const []);
+    return [
+      for (var i = 0; i < codes.length; i++)
+        Division.fromJson(codes[i], i < labels.length ? labels[i] : null),
+    ];
   }
 
   AnnouncementAttachment _att(Map<String, dynamic> m) => AnnouncementAttachment(
@@ -72,9 +74,7 @@ class ApiAnnouncementRepository implements AnnouncementRepository {
         updatedAt: apiDateTimeOpt(m['updatedAt']),
         expiresAt: apiDateTimeOpt(m['expiresAt']),
         pinned: (m['pinned'] as bool?) ?? false,
-        targetDivisions: [
-          for (final v in (m['targetDivisions'] as List? ?? [])) _div(v),
-        ],
+        targetDivisions: _targets(m),
         attachments: [
           for (final v in (m['attachments'] as List? ?? [])) _att(_map(v)),
         ],
@@ -86,7 +86,7 @@ class ApiAnnouncementRepository implements AnnouncementRepository {
         'publishAt': d.publishAt?.toIso8601String(),
         'expiresAt': d.expiresAt?.toIso8601String(),
         'pinned': d.pinned,
-        'targetDivisions': [for (final v in d.targetDivisions) v.name],
+        'targetDivisions': [for (final v in d.targetDivisions) v.code],
         'attachments': [
           for (final a in d.attachments)
             {'name': a.name, 'sizeBytes': a.sizeBytes, 'key': a.key},

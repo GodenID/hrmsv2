@@ -11,6 +11,7 @@ import '../../../data/announcement_repository.dart';
 import '../../../data/api/api_auth_repository.dart' show ApiConfig;
 import '../../../data/api/api_upload_repository.dart';
 import '../../../data/auth_repository.dart';
+import '../../../data/master_data.dart';
 
 typedef AnnouncementSubmit = Future<void> Function(AnnouncementDraft draft);
 
@@ -78,6 +79,9 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
   final Set<Division> _targets = {};
   final List<AnnouncementAttachment> _attachments = [];
 
+  /// Pilihan divisi sasaran dari master data (dimuat sekali per editor).
+  Future<List<MasterDivision>>? _divisionsFuture;
+
   /// Bytes lampiran baru (kunci: nama file), untuk upload S3 mode API.
   final Map<String, Uint8List> _attachmentData = {};
   String? _attachmentError;
@@ -115,6 +119,14 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
     _titleController.dispose();
     _bodyController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _divisionsFuture ??= AppScope.of(context).master.fetchDivisions(
+          SessionScope.userOf(context),
+        );
   }
 
   String? _validateTitle(String? value) {
@@ -458,25 +470,63 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
           const SizedBox(height: AppSpacing.xl),
           Text('Untuk divisi', style: textTheme.labelSmall),
           const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              for (final d in Division.values)
-                FilterChip(
-                  label: Text(d.label),
-                  selected: _targets.contains(d),
-                  onSelected: _isSaving
-                      ? null
-                      : (selected) => setState(() {
-                          if (selected) {
-                            _targets.add(d);
-                          } else {
-                            _targets.remove(d);
-                          }
-                        }),
-                ),
-            ],
+          FutureBuilder<List<MasterDivision>>(
+            future: _divisionsFuture,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState != ConnectionState.done) {
+                return Text('Memuat divisi…', style: textTheme.bodySmall);
+              }
+              if (snapshot.hasError) {
+                return Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Daftar divisi gagal dimuat.',
+                        style: textTheme.bodySmall,
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _isSaving
+                          ? null
+                          : () => setState(() {
+                                _divisionsFuture = AppScope.of(context)
+                                    .master
+                                    .fetchDivisions(
+                                      SessionScope.userOf(context),
+                                    );
+                              }),
+                      child: const Text('Coba lagi'),
+                    ),
+                  ],
+                );
+              }
+              final options = <Division>{
+                for (final d in snapshot.data ?? const <MasterDivision>[])
+                  d.division,
+                ..._targets,
+              }.toList()
+                ..sort((a, b) => a.label.compareTo(b.label));
+              return Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  for (final d in options)
+                    FilterChip(
+                      label: Text(d.label),
+                      selected: _targets.contains(d),
+                      onSelected: _isSaving
+                          ? null
+                          : (selected) => setState(() {
+                                if (selected) {
+                                  _targets.add(d);
+                                } else {
+                                  _targets.remove(d);
+                                }
+                              }),
+                    ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: 6),
           Text(

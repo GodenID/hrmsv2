@@ -21,6 +21,7 @@ import '../events/event_list_page.dart';
 import '../leave/leave_page.dart';
 import '../notifications/broadcast_page.dart';
 import '../reports/reports_page.dart';
+import '../settings/master_data_page.dart';
 import '../warnings/warnings_page.dart';
 import '../notifications/widgets/notification_bell.dart';
 import '../profile/profile_photo.dart';
@@ -137,6 +138,16 @@ List<_Destination> _destinationsFor(UserRole role) {
         icon: Icons.campaign_outlined,
         selectedIcon: Icons.campaign,
         builder: (_) => const BroadcastPage(),
+        section: _Section.manage,
+        primaryOnMobile: false,
+      ),
+    if (role == UserRole.superadmin)
+      _Destination(
+        tab: ShellTab.masterData,
+        label: 'Master data',
+        icon: Icons.tune_outlined,
+        selectedIcon: Icons.tune,
+        builder: (_) => const MasterDataPage(),
         section: _Section.manage,
         primaryOnMobile: false,
       ),

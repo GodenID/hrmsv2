@@ -63,13 +63,8 @@ bool passwordOk(String password, String username) {
   return true;
 }
 
-const Set<String> divisions = {
-  'financeAccounting',
-  'hrIt',
-  'businessDevelopment',
-  'produksiPrasasti',
-  'produksiMutiari',
-};
+/// Divisi & jabatan kini berupa master data di database (tabel `divisions`
+/// dan `positions`), dikelola Super Admin lewat `/master/...`.
 
 const Set<String> employmentStatuses = {
   'permanent',
