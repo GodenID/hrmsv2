@@ -285,6 +285,7 @@ ReportSheetData eventSheet(
     header: const [
       'Nama',
       'Perusahaan',
+      'Entity',
       'Kategori',
       'Tanggal',
       'Lokasi',
@@ -297,6 +298,7 @@ ReportSheetData eventSheet(
         [
           e.name,
           e.company,
+          e.entity?.name ?? '—',
           e.category.name,
           DateFormatId.dateRange(e.startDate, e.endDate),
           e.location,
@@ -558,6 +560,7 @@ ReportSheetData eventRecapSheet(
     header: const [
       'Nama',
       'Perusahaan',
+      'Entity',
       'Kategori',
       'Tanggal',
       'Lokasi',
@@ -571,6 +574,7 @@ ReportSheetData eventRecapSheet(
         [
           e.name,
           e.company,
+          e.entity?.name ?? '—',
           e.category.name,
           DateFormatId.dateRange(e.startDate, e.endDate),
           e.location,

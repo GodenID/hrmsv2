@@ -185,8 +185,8 @@ void main() {
           ],
         ),
       ]);
-      expect(sheet.rows.single[7], 1);
-      expect(sheet.rows.single[8], contains('Budi Santoso'));
+      expect(sheet.rows.single[8], 1);
+      expect(sheet.rows.single[9], contains('Budi Santoso'));
     });
   });
 
@@ -205,6 +205,7 @@ void main() {
           name: 'Acara Tes',
           company: 'PT Tes',
           category: const EventCategory(id: 'EC-1', name: 'Workshop'),
+          entity: const EventEntity(id: 'EN-1', name: 'PT Prasasti Group'),
           startDate: DateTime(2026, 10, 15),
           endDate: DateTime(2026, 10, 16),
           location: 'Hall Tes',
@@ -214,8 +215,10 @@ void main() {
           poValue: 180000000,
         ),
       ]);
+      expect(events.header, contains('Entity'));
       expect(events.rows.single[1], 'PT Tes');
-      expect(events.rows.single[3], '15–16 Okt 2026');
+      expect(events.rows.single[2], 'PT Prasasti Group');
+      expect(events.rows.single[4], '15–16 Okt 2026');
     });
   });
 

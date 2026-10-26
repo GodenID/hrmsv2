@@ -131,8 +131,11 @@ class _EventFormPageState extends State<EventFormPage> {
 
   /// Entity aktif + entity event ini walau sudah dinonaktifkan.
   List<EventEntity> get _entityOptions {
-    final out = [...?_entities];
     final current = _entity;
+    final out = [
+      for (final e in _entities ?? const <EventEntity>[])
+        if (e.active || e.id == current?.id) e,
+    ];
     if (current != null && !out.contains(current)) out.add(current);
     out.sort(
       (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),

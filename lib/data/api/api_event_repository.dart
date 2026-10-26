@@ -88,6 +88,7 @@ class ApiEventRepository implements EventRepository {
           : EventEntity(
               id: (ent['id'] ?? '').toString(),
               name: (ent['name'] ?? '').toString(),
+              active: (ent['active'] as bool?) ?? true,
             ),
       startDate: apiDateTime(m['startDate']),
       endDate: apiDateTime(m['endDate']),
@@ -197,11 +198,11 @@ class ApiEventRepository implements EventRepository {
     return List<EventEntity>.unmodifiable(
       [
         for (final e in (m['entities'] as List? ?? []))
-          if ((_map(e)['active'] as bool?) ?? true)
-            EventEntity(
-              id: (_map(e)['id'] ?? '').toString(),
-              name: (_map(e)['name'] ?? '').toString(),
-            ),
+          EventEntity(
+            id: (_map(e)['id'] ?? '').toString(),
+            name: (_map(e)['name'] ?? '').toString(),
+            active: (_map(e)['active'] as bool?) ?? true,
+          ),
       ],
     );
   }
@@ -224,7 +225,40 @@ class ApiEventRepository implements EventRepository {
     return EventEntity(
       id: (m['id'] ?? '').toString(),
       name: (m['name'] ?? '').toString(),
+      active: (m['active'] as bool?) ?? true,
     );
+  }
+
+  @override
+  Future<EventEntity> updateEntity(
+    AuthUser actor, {
+    required String id,
+    required String name,
+    required bool active,
+  }) async {
+    final res = await _client.patch(
+      Uri.parse('$_base/events/entities/$id'),
+      headers: await _h(),
+      body: jsonEncode({'name': name, 'active': active}),
+    );
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    _ping();
+    return EventEntity(
+      id: (m['id'] ?? '').toString(),
+      name: (m['name'] ?? '').toString(),
+      active: (m['active'] as bool?) ?? true,
+    );
+  }
+
+  @override
+  Future<void> deleteEntity(AuthUser actor, {required String id}) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/events/entities/$id'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    _ping();
   }
 
   @override

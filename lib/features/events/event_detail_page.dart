@@ -36,8 +36,9 @@ class _EventDetailPageState extends State<EventDetailPage> {
   String? _error;
   bool _isLeaving = false;
   bool _isDeleting = false;
+  bool _isSavingEntity = false;
 
-  bool get _busy => _isLeaving || _isDeleting;
+  bool get _busy => _isLeaving || _isDeleting || _isSavingEntity;
 
   @override
   void didChangeDependencies() {
@@ -150,6 +151,99 @@ class _EventDetailPageState extends State<EventDetailPage> {
         setState(() => _isDeleting = false);
         showAppSnackBar(context, 'Gagal menghapus event. Coba lagi.');
       }
+    }
+  }
+
+  Future<void> _setEntity() async {
+    if (_busy) return;
+    List<EventEntity> entities;
+    try {
+      entities = await _repo.fetchEntities(SessionScope.userOf(context));
+    } on AppException catch (e) {
+      if (mounted) showAppSnackBar(context, e.message);
+      return;
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(context, 'Daftar entity gagal dimuat. Coba lagi.');
+      }
+      return;
+    }
+    if (!mounted) return;
+
+    final current = _event.entity;
+    final options = [
+      for (final e in entities)
+        if (e.active || e.id == current?.id) e,
+    ];
+    if (options.isEmpty) {
+      showAppSnackBar(
+        context,
+        'Belum ada entity aktif. Tambahkan lewat Pengaturan event.',
+      );
+      return;
+    }
+    var picked = current;
+    final chosen = await showDialog<EventEntity>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialog) => AlertDialog(
+          title: const Text('Atur entity event'),
+          content: DropdownButtonFormField<EventEntity>(
+            initialValue: picked,
+            isExpanded: true,
+            items: [
+              for (final e in options)
+                DropdownMenuItem(
+                  value: e,
+                  child: Text(e.name, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: (v) => setDialog(() => picked = v),
+            decoration: const InputDecoration(labelText: 'Entity'),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              style: TextButton.styleFrom(
+                foregroundColor: context.inkSecondary,
+              ),
+              child: const Text('Batal'),
+            ),
+            FilledButton(
+              onPressed: picked == null
+                  ? null
+                  : () => Navigator.of(context).pop(picked),
+              child: const Text('Simpan'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (chosen == null || chosen.id == current?.id || !mounted) return;
+
+    setState(() => _isSavingEntity = true);
+    try {
+      final updated = await _repo.updateEvent(
+        SessionScope.userOf(context),
+        id: _event.id,
+        name: _event.name,
+        company: _event.company,
+        categoryId: _event.category.id,
+        entityId: chosen.id,
+        startDate: _event.startDate,
+        endDate: _event.endDate,
+        location: _event.location,
+        poValue: _event.poValue ?? 0,
+      );
+      if (!mounted) return;
+      setState(() => _event = updated);
+      showAppSnackBar(context, 'Entity event disimpan.');
+    } on AppException catch (e) {
+      if (mounted) showAppSnackBar(context, e.message);
+    } catch (_) {
+      if (mounted) showAppSnackBar(context, 'Gagal menyimpan entity. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _isSavingEntity = false);
     }
   }
 
@@ -287,7 +381,16 @@ class _EventDetailPageState extends State<EventDetailPage> {
                     label: 'Tanggal',
                     value: DateFormatId.dateRange(e.startDate, e.endDate),
                   ),
-                  InfoRow(label: 'Entity', value: e.entity?.name ?? '—'),
+                  InfoRow(
+                    label: 'Entity',
+                    value: e.entity?.name ?? 'Belum diisi',
+                    trailing: user.role.canManageEvents
+                        ? TextButton(
+                            onPressed: _busy ? null : _setEntity,
+                            child: Text(e.entity == null ? 'Atur' : 'Ubah'),
+                          )
+                        : null,
+                  ),
                   InfoRow(label: 'Perusahaan', value: e.company),
                   InfoRow(label: 'Kategori event', value: e.category.name),
                   InfoRow(label: 'Lokasi acara', value: e.location),

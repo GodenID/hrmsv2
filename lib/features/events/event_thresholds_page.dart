@@ -29,9 +29,11 @@ class _EventSettingsPageState extends State<EventSettingsPage> {
   bool _initialized = false;
 
   List<EventCategory>? _categories;
+  List<EventEntity>? _entities;
   bool _isLoading = true;
   bool _isSaving = false;
   bool _busyCategory = false;
+  bool _busyEntity = false;
   String? _error;
 
   @override
@@ -63,13 +65,17 @@ class _EventSettingsPageState extends State<EventSettingsPage> {
       final results = await Future.wait([
         repo.fetchThresholds(),
         repo.fetchCategories(SessionScope.userOf(context)),
+        repo.fetchEntities(SessionScope.userOf(context)),
       ]);
       if (!mounted) return;
       final t = results[0] as EventThresholds;
       _small.text = Rupiah.group(t.smallMax);
       _medium.text = Rupiah.group(t.mediumMax);
       _large.text = Rupiah.group(t.largeMax);
-      setState(() => _categories = results[1] as List<EventCategory>);
+      setState(() {
+        _categories = results[1] as List<EventCategory>;
+        _entities = results[2] as List<EventEntity>;
+      });
     } on AppException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
@@ -90,6 +96,19 @@ class _EventSettingsPageState extends State<EventSettingsPage> {
     } catch (_) {
       if (mounted) {
         showAppSnackBar(context, 'Daftar kategori gagal dimuat. Coba lagi.');
+      }
+    }
+  }
+
+  Future<void> _reloadEntities() async {
+    try {
+      final entities = await AppScope.of(context).events.fetchEntities(
+        SessionScope.userOf(context),
+      );
+      if (mounted) setState(() => _entities = entities);
+    } catch (_) {
+      if (mounted) {
+        showAppSnackBar(context, 'Daftar entity gagal dimuat. Coba lagi.');
       }
     }
   }
@@ -284,6 +303,201 @@ class _EventSettingsPageState extends State<EventSettingsPage> {
     }
   }
 
+  Future<void> _editEntity({EventEntity? existing}) async {
+    final controller = TextEditingController(text: existing?.name);
+    var active = existing?.active ?? true;
+    String? dialogError;
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialog) {
+          Future<void> submit() async {
+            final ok = await _submitEntity(
+              controller.text,
+              existing: existing,
+              active: active,
+              setDialogError: (m) => setDialog(() => dialogError = m),
+            );
+            if (ok && context.mounted) Navigator.of(context).pop(true);
+          }
+
+          return AlertDialog(
+            title: Text(existing == null ? 'Tambah entity' : 'Ubah entity'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                TextFormField(
+                  controller: controller,
+                  autofocus: true,
+                  maxLength: 80,
+                  textCapitalization: TextCapitalization.words,
+                  textInputAction: TextInputAction.done,
+                  decoration: const InputDecoration(
+                    labelText: 'Nama entity',
+                    hintText: 'mis. PT Prasasti Group',
+                  ),
+                  onFieldSubmitted: (_) => submit(),
+                ),
+                if (existing != null)
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('Aktif'),
+                    subtitle: const Text(
+                      'Nonaktif: tidak muncul di pilihan event baru.',
+                    ),
+                    value: active,
+                    onChanged: (v) => setDialog(() => active = v),
+                  ),
+                if (dialogError != null) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    dialogError!,
+                    style: Theme.of(
+                      context,
+                    ).inputDecorationTheme.errorStyle,
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                style: TextButton.styleFrom(
+                  foregroundColor: context.inkSecondary,
+                ),
+                child: const Text('Batal'),
+              ),
+              FilledButton(
+                onPressed: submit,
+                child: Text(existing == null ? 'Tambah' : 'Simpan'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    controller.dispose();
+    if (saved == true && mounted) {
+      await _reloadEntities();
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          existing == null ? 'Entity ditambahkan.' : 'Entity diperbarui.',
+        );
+      }
+    }
+  }
+
+  /// Menyimpan entity dari dialog. Mengembalikan true bila berhasil.
+  Future<bool> _submitEntity(
+    String name, {
+    required EventEntity? existing,
+    required bool active,
+    required ValueChanged<String> setDialogError,
+  }) async {
+    try {
+      final repo = AppScope.of(context).events;
+      final actor = SessionScope.userOf(context);
+      final clean = name.trim();
+      if (existing == null) {
+        await repo.createEntity(actor, name: clean);
+      } else {
+        await repo.updateEntity(
+          actor,
+          id: existing.id,
+          name: clean,
+          active: active,
+        );
+      }
+      return true;
+    } catch (e) {
+      setDialogError(
+        e is AppException
+            ? e.message
+            : 'Tidak dapat terhubung ke server. Coba lagi.',
+      );
+      return false;
+    }
+  }
+
+  Future<void> _toggleEntity(EventEntity entity) async {
+    if (_busyEntity) return;
+    setState(() => _busyEntity = true);
+    try {
+      await AppScope.of(context).events.updateEntity(
+        SessionScope.userOf(context),
+        id: entity.id,
+        name: entity.name,
+        active: !entity.active,
+      );
+      await _reloadEntities();
+      if (mounted) {
+        showAppSnackBar(
+          context,
+          entity.active
+              ? 'Entity "${entity.name}" dinonaktifkan.'
+              : 'Entity "${entity.name}" diaktifkan kembali.',
+        );
+      }
+    } on AppException catch (e) {
+      if (mounted) showAppSnackBar(context, e.message);
+    } catch (_) {
+      if (mounted) showAppSnackBar(context, 'Gagal mengubah entity. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _busyEntity = false);
+    }
+  }
+
+  Future<void> _deleteEntity(EventEntity entity) async {
+    if (_busyEntity) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hapus entity?'),
+        content: Text(
+          '"${entity.name}" akan dihapus dari daftar pilihan. '
+          'Entity yang masih dipakai event tidak bisa dihapus; '
+          'nonaktifkan saja bila hanya ingin menyembunyikannya.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            style: TextButton.styleFrom(
+              foregroundColor: context.inkSecondary,
+            ),
+            child: const Text('Kembali'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: context.danger,
+              foregroundColor: context.isDark ? context.surface : Colors.white,
+            ),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busyEntity = true);
+    try {
+      await AppScope.of(context).events.deleteEntity(
+        SessionScope.userOf(context),
+        id: entity.id,
+      );
+      if (!mounted) return;
+      await _reloadEntities();
+      if (mounted) showAppSnackBar(context, 'Entity dihapus.');
+    } on AppException catch (e) {
+      if (mounted) showAppSnackBar(context, e.message);
+    } catch (_) {
+      if (mounted) showAppSnackBar(context, 'Gagal menghapus. Coba lagi.');
+    } finally {
+      if (mounted) setState(() => _busyEntity = false);
+    }
+  }
+
   Widget _field(
     String label,
     TextEditingController controller, {
@@ -316,6 +530,7 @@ class _EventSettingsPageState extends State<EventSettingsPage> {
     final draft = _draft;
     final draftValid = draft != null && draft.validate() == null;
     final cats = _categories;
+    final ents = _entities;
 
     return PageScaffold(
       title: 'Pengaturan event',
@@ -436,6 +651,51 @@ class _EventSettingsPageState extends State<EventSettingsPage> {
                     icon: const Icon(Icons.add, size: 18),
                     label: const Text('Tambah kategori'),
                   ),
+                  const SizedBox(height: AppSpacing.xxl),
+                  const SectionLabel('Entity event'),
+                  Text(
+                    'Dipilih per event, mis. PT Prasasti Group. Entity yang '
+                    'dinonaktifkan tidak muncul di pilihan event baru, tetapi '
+                    'tetap tampil pada event yang sudah memakainya.',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: context.inkSecondary,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  Panel(
+                    padding: EdgeInsets.zero,
+                    child: ents == null || ents.isEmpty
+                        ? const EmptyState(
+                            icon: Icons.account_balance_outlined,
+                            title: 'Belum ada entity',
+                            message: 'Tambahkan entity pertama di bawah.',
+                          )
+                        : Column(
+                            children: [
+                              for (var i = 0; i < ents.length; i++) ...[
+                                if (i > 0) const Divider(),
+                                _EntityRow(
+                                  entity: ents[i],
+                                  busy: _busyEntity,
+                                  onEdit: () =>
+                                      _editEntity(existing: ents[i]),
+                                  onToggle: () => _toggleEntity(ents[i]),
+                                  onDelete: () => _deleteEntity(ents[i]),
+                                ),
+                              ],
+                            ],
+                          ),
+                  ),
+                  const SizedBox(height: AppSpacing.lg),
+                  OutlinedButton.icon(
+                    onPressed: _busyEntity ? null : () => _editEntity(),
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(0, 44),
+                    ),
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Tambah entity'),
+                  ),
                 ],
               ),
             ),
@@ -478,6 +738,77 @@ class _CategoryRow extends StatelessWidget {
           IconButton(
             tooltip: 'Hapus ${category.name}',
             onPressed: onDelete,
+            color: context.danger,
+            icon: const Icon(Icons.delete_outline, size: 20),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EntityRow extends StatelessWidget {
+  const _EntityRow({
+    required this.entity,
+    required this.busy,
+    required this.onEdit,
+    required this.onToggle,
+    required this.onDelete,
+  });
+
+  final EventEntity entity;
+  final bool busy;
+  final VoidCallback onEdit;
+  final VoidCallback onToggle;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 8, 6),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entity.name,
+                  style: textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: entity.active ? null : context.inkSecondary,
+                  ),
+                ),
+                if (!entity.active)
+                  Text(
+                    'Nonaktif — tidak muncul di pilihan event baru',
+                    style: textTheme.bodySmall?.copyWith(fontSize: 12),
+                  ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: entity.active
+                ? 'Nonaktifkan ${entity.name}'
+                : 'Aktifkan ${entity.name}',
+            onPressed: busy ? null : onToggle,
+            icon: Icon(
+              entity.active
+                  ? Icons.visibility_outlined
+                  : Icons.visibility_off_outlined,
+              size: 20,
+            ),
+          ),
+          IconButton(
+            tooltip: 'Ubah ${entity.name}',
+            onPressed: busy ? null : onEdit,
+            icon: const Icon(Icons.edit_outlined, size: 20),
+          ),
+          IconButton(
+            tooltip: 'Hapus ${entity.name}',
+            onPressed: busy ? null : onDelete,
             color: context.danger,
             icon: const Icon(Icons.delete_outline, size: 20),
           ),

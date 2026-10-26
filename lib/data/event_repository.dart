@@ -39,12 +39,26 @@ abstract class EventRepository {
   /// tersisa.
   Future<void> deleteCategory(AuthUser actor, {required String id});
 
-  /// Semua entity event (pilihan pada formulir). Semua role boleh melihat.
+  /// Semua entity event, termasuk yang nonaktif. Formulir hanya menampilkan
+  /// yang aktif (plus entity event yang sedang diubah).
   Future<List<EventEntity>> fetchEntities(AuthUser viewer);
 
   /// Menambah entity baru — Manager & Super Admin. Nama wajib unik
   /// (abaikan kapitalisasi).
   Future<EventEntity> createEntity(AuthUser actor, {required String name});
+
+  /// Mengubah nama dan/atau status aktif entity — Manager & Super Admin.
+  /// Nama wajib unik (abaikan kapitalisasi).
+  Future<EventEntity> updateEntity(
+    AuthUser actor, {
+    required String id,
+    required String name,
+    required bool active,
+  });
+
+  /// Hapus entity — Manager & Super Admin. Ditolak bila entity masih dipakai
+  /// event (pesan menyebut jumlahnya).
+  Future<void> deleteEntity(AuthUser actor, {required String id});
 
   /// Semua event, terdekat lebih dulu (urut tanggal mulai).
   Future<List<EventItem>> fetchEvents(AuthUser viewer);
@@ -196,10 +210,18 @@ class EventCategory {
 /// Entity penyelenggara event (mis. PT Prasasti Group). Dibuat Manager &
 /// Super Admin langsung dari formulir event, lalu dipilih per event.
 class EventEntity {
-  const EventEntity({required this.id, required this.name});
+  const EventEntity({
+    required this.id,
+    required this.name,
+    this.active = true,
+  });
 
   final String id;
   final String name;
+
+  /// Entity nonaktif tidak muncul di pilihan event baru, tetapi tetap
+  /// tampil pada event yang sudah memakainya.
+  final bool active;
 
   @override
   bool operator ==(Object other) => other is EventEntity && other.id == id;

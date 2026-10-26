@@ -109,13 +109,14 @@ Router eventRouter(Db db, Config cfg) {
     Map<String, dynamic>? entity;
     if (e['entity_id'] != null) {
       final entRs = await tx.execute(
-          Sql.named('SELECT id, name FROM event_entities WHERE id=@i::uuid'),
+          Sql.named('SELECT id, name, active FROM event_entities WHERE id=@i::uuid'),
           parameters: {'i': (e['entity_id'] as Object).toString()});
       if (entRs.isNotEmpty) {
         final m = entRs.first.toColumnMap();
         entity = {
           'id': (m['id'] as Object).toString(),
           'name': m['name'],
+          'active': m['active'],
         };
       }
     }
@@ -323,6 +324,83 @@ Router eventRouter(Db db, Config cfg) {
     }
   });
 
+  r.patch('/events/entities/<id>', (Request req, String id) async {
+    try {
+      final actor = await me(req);
+      if (!canManage(actor['role'] as String)) {
+        throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat mengubah entity.');
+      }
+      final b = await readJson(req);
+      final hasName = b.containsKey('name');
+      final hasActive = b.containsKey('active');
+      if (!hasName && !hasActive) {
+        throw const _Http(422, 'Tidak ada perubahan entity.');
+      }
+      if (hasActive && b['active'] is! bool) {
+        throw const _Http(422, 'Status aktif entity tidak valid.');
+      }
+      if (hasName) {
+        final name = ((b['name'] ?? '') as String).trim();
+        if (name.length < 2) throw const _Http(422, 'Nama entity minimal 2 karakter.');
+        if (name.length > 80) throw const _Http(422, 'Nama entity maksimal 80 karakter.');
+      }
+      final saved = await db.pool.runTx((tx) async {
+        final cur = await tx.execute(Sql.named(
+          'SELECT id, name, active FROM event_entities WHERE id=@i::uuid',
+        ), parameters: {'i': id});
+        if (cur.isEmpty) throw const _Http(404, 'Entity tidak ditemukan.');
+        final curMap = cur.first.toColumnMap();
+        final name = hasName
+            ? ((b['name'] ?? '') as String).trim()
+            : (curMap['name'] as String);
+        final active = hasActive ? b['active'] as bool : curMap['active'] as bool;
+        if (hasName) {
+          final dup = await tx.execute(Sql.named(
+            'SELECT id FROM event_entities WHERE LOWER(BTRIM(name))=LOWER(@n) AND id<>@i::uuid',
+          ), parameters: {'n': name, 'i': id});
+          if (dup.isNotEmpty) throw _Http(409, 'Entity "$name" sudah ada.');
+        }
+        final upd = await tx.execute(Sql.named(
+          'UPDATE event_entities SET name=@n, active=@a WHERE id=@i::uuid RETURNING id, name, active',
+        ), parameters: {'n': name, 'a': active, 'i': id});
+        return upd.first.toColumnMap();
+      });
+      return json({
+        'id': (saved['id'] as Object).toString(),
+        'name': saved['name'],
+        'active': saved['active'],
+      });
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.delete('/events/entities/<id>', (Request req, String id) async {
+    try {
+      final actor = await me(req);
+      if (!canManage(actor['role'] as String)) {
+        throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat menghapus entity.');
+      }
+      await db.pool.runTx((tx) async {
+        final used = await tx.execute(Sql.named(
+          'SELECT COUNT(*) AS c FROM events WHERE entity_id=@i::uuid',
+        ), parameters: {'i': id});
+        final n = int.parse((used.first.toColumnMap()['c'] as Object).toString());
+        if (n > 0) {
+          throw _Http(400, 'Entity dipakai $n event. Pindahkan eventnya dulu sebelum menghapus.');
+        }
+        final del = await tx.execute(
+          Sql.named('DELETE FROM event_entities WHERE id=@i::uuid'),
+          parameters: {'i': id},
+        );
+        if (del.affectedRows == 0) throw const _Http(404, 'Entity tidak ditemukan.');
+      });
+      return json({'ok': true});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
   // ---------- event ----------
   Future<void> ensureToday(TxSession tx, String viewer, List<Map<String, dynamic>> evs) async {
     final today = dateOnly(nowWib());
@@ -398,15 +476,16 @@ Router eventRouter(Db db, Config cfg) {
         parameters: {'i': ((b['categoryId'] ?? '') as String)});
     if (cat.isEmpty) throw const _Http(422, 'Kategori event tidak dikenal.');
     String s(String k) => ((b[k] ?? '') as String).trim();
-    // Entity opsional di server agar aplikasi versi lama tetap bisa menyimpan
-    // event; formulir baru selalu mengirim entityId.
+    // Entity wajib: event lama tanpa entity harus diisi dulu lewat formulir
+    // atau aksi "Atur entity" sebelum bisa disimpan ulang.
     final entityId = s('entityId');
-    if (entityId.isNotEmpty) {
-      final ent = await tx.execute(
-          Sql.named('SELECT id FROM event_entities WHERE id=@i::uuid'),
-          parameters: {'i': entityId});
-      if (ent.isEmpty) throw const _Http(422, 'Entity event tidak dikenal.');
+    if (entityId.isEmpty) {
+      throw const _Http(422, 'Entity event wajib dipilih.');
     }
+    final ent = await tx.execute(
+        Sql.named('SELECT id FROM event_entities WHERE id=@i::uuid'),
+        parameters: {'i': entityId});
+    if (ent.isEmpty) throw const _Http(422, 'Entity event tidak dikenal.');
     final params = <String, dynamic>{
       'n': s('name'),
       'c': s('company'),
