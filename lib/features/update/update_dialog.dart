@@ -9,17 +9,30 @@ import '../../core/theme/theme_colors.dart';
 
 enum _Phase { prompt, downloading, ready, launching }
 
-/// Dialog pembaruan: tawarkan versi baru, unduh dengan progres, verifikasi
+/// Lapisan pembaruan: tawarkan versi baru, unduh dengan progres, verifikasi
 /// checksum, lalu buka pemasang Android.
+///
+/// Bukan route dialog: [AppUpdateGate] menaruhnya di atas Navigator. Pembaruan
+/// wajib tidak punya tombol tutup dan tidak bisa ditembus; lapisan hanya hilang
+/// setelah versi terpasang benar-benar naik.
 class AppUpdateDialog extends StatefulWidget {
   const AppUpdateDialog({
     super.key,
     required this.update,
     required this.updater,
+    this.onDismiss,
+    this.onInstalled,
   });
 
   final AppUpdate update;
   final AppUpdater updater;
+
+  /// Menutup lapisan pembaruan opsional (tombol "Nanti" atau ketuk di luar).
+  /// Null untuk pembaruan wajib.
+  final VoidCallback? onDismiss;
+
+  /// Dipanggil saat versi terpasang sudah memenuhi versi rilis.
+  final VoidCallback? onInstalled;
 
   @override
   State<AppUpdateDialog> createState() => _AppUpdateDialogState();
@@ -52,15 +65,45 @@ class _AppUpdateDialogState extends State<AppUpdateDialog>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Kembali dari layar izin "Install unknown apps": segarkan status.
-    if (state == AppLifecycleState.resumed && _phase == _Phase.ready) {
+    if (state != AppLifecycleState.resumed) return;
+    if (_phase == _Phase.ready) {
+      // Kembali dari layar izin "Install unknown apps": segarkan status.
       unawaited(_refreshInstallPermission());
+    } else if (_phase == _Phase.launching) {
+      // Kembali dari layar pemasang: pastikan versi benar-benar terpasang.
+      unawaited(_verifyInstalled());
     }
   }
 
   Future<void> _refreshInstallPermission() async {
     final ok = await widget.updater.canInstall();
     if (mounted) setState(() => _canInstall = ok);
+  }
+
+  /// Setelah pengguna kembali dari pemasang, cek ulang versi terpasang.
+  ///
+  /// Pemasangan yang berhasil biasanya membunuh proses ini dan membuka versi
+  /// baru. Bila proses masih hidup dan versinya belum naik, pengguna membatalkan
+  /// pemasangan: kembalikan ke tahap siap pasang, bukan menutup lapisan.
+  Future<void> _verifyInstalled() async {
+    int current;
+    try {
+      current = await widget.updater.currentVersionCode();
+    } catch (_) {
+      current = 0;
+    }
+    if (!mounted) return;
+    if (current >= _release.versionCode) {
+      widget.onInstalled?.call();
+      return;
+    }
+    setState(() {
+      _phase = _Phase.ready;
+      _error =
+          'Pemasangan belum selesai. Pasang lagi, lalu setujui di layar '
+          'Android.';
+    });
+    await _refreshInstallPermission();
   }
 
   Future<void> _startDownload() async {
@@ -135,33 +178,51 @@ class _AppUpdateDialogState extends State<AppUpdateDialog>
 
   Future<void> _dismissLater() async {
     await widget.updater.skip(_release.versionCode);
-    if (mounted) Navigator.of(context).pop();
+    widget.onDismiss?.call();
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final update = widget.update;
+    final forced = widget.update.forced;
 
     return PopScope(
-      // Pembaruan wajib tidak bisa ditutup dengan tombol kembali, kecuali
-      // pemasangan sudah dibuka atau unduhan gagal (agar aplikasi tidak
-      // terkunci permanen saat jaringan bermasalah).
-      canPop:
-          !update.forced ||
-          _phase == _Phase.launching ||
-          (_phase == _Phase.prompt && _error != null),
-      child: AlertDialog(
-        title: Text(_title()),
-        content: SizedBox(
-          width: 420,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: _content(textTheme),
+      // Lapisan ini bukan route, jadi tombol kembali tidak bisa menutupnya.
+      // Untuk pembaruan wajib tidak ada jalan keluar sampai versi terpasang.
+      canPop: !forced,
+      child: Stack(
+        children: [
+          ModalBarrier(
+            dismissible: !forced,
+            color: Colors.black54,
+            onDismiss: forced ? null : widget.onDismiss,
           ),
-        ),
-        actions: _actions(),
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 468),
+                  child: AlertDialog(
+                    // Inset milik Dialog tidak dipakai: jarak layar diatur
+                    // pembungkus di atas.
+                    insetPadding: EdgeInsets.zero,
+                    title: Text(_title()),
+                    content: SizedBox(
+                      width: 420,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: _content(textTheme),
+                      ),
+                    ),
+                    actions: _actions(),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -285,21 +346,13 @@ class _AppUpdateDialogState extends State<AppUpdateDialog>
   }
 
   List<Widget> _actions() {
-    final canClose =
-        !widget.update.forced ||
-        _phase == _Phase.launching ||
-        (_phase == _Phase.prompt && _error != null);
+    final forced = widget.update.forced;
 
     switch (_phase) {
       case _Phase.prompt:
         return [
-          if (!widget.update.forced)
-            TextButton(onPressed: _dismissLater, child: const Text('Nanti'))
-          else if (canClose)
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Tutup'),
-            ),
+          if (!forced)
+            TextButton(onPressed: _dismissLater, child: const Text('Nanti')),
           FilledButton.icon(
             onPressed: _startDownload,
             icon: const Icon(Icons.system_update_alt, size: 18),
@@ -315,7 +368,7 @@ class _AppUpdateDialogState extends State<AppUpdateDialog>
         ];
       case _Phase.ready:
         return [
-          if (!widget.update.forced)
+          if (!forced)
             TextButton(onPressed: _dismissLater, child: const Text('Nanti')),
           FilledButton.icon(
             onPressed: _canInstall ? _install : _permissionFirst,
@@ -327,11 +380,11 @@ class _AppUpdateDialogState extends State<AppUpdateDialog>
           ),
         ];
       case _Phase.launching:
+        // Wajib: tanpa tombol. Bila pengguna membatalkan pemasangan, lifecycle
+        // resume mengembalikan layar ke tahap siap pasang.
         return [
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Tutup'),
-          ),
+          if (!forced)
+            TextButton(onPressed: widget.onDismiss, child: const Text('Tutup')),
         ];
     }
   }

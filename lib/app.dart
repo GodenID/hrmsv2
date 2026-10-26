@@ -30,7 +30,6 @@ class PrasastiConnectApp extends StatelessWidget {
         // Cek pembaruan tepat saat aplikasi dibuka, di atas halaman apa pun.
         builder: (context, child) => AppUpdateGate(
           updater: dependencies.updater,
-          navigatorKey: PushNotifications.navigatorKey,
           child: child ?? const SizedBox.shrink(),
         ),
         theme: AppTheme.light(),

@@ -7,19 +7,14 @@ import 'update_dialog.dart';
 
 /// Menjalankan pemeriksaan pembaruan sekali setiap aplikasi dibuka.
 ///
-/// Dipasang sebagai `MaterialApp.builder`, jadi dialog tetap muncul di atas
-/// halaman mana pun — termasuk splash dan login — sebelum pengguna sempat
-/// memakai versi lama.
+/// Lapisan pembaruan dipasang sebagai anak teratas [Stack] di atas Navigator,
+/// bukan sebagai route dialog. Route dialog ikut terganti saat splash memanggil
+/// `pushReplacement`, sehingga pembaruan wajib bisa hilang sebelum sempat
+/// dipasang. Lapisan ini tidak tersentuh navigasi mana pun.
 class AppUpdateGate extends StatefulWidget {
-  const AppUpdateGate({
-    super.key,
-    required this.updater,
-    required this.navigatorKey,
-    required this.child,
-  });
+  const AppUpdateGate({super.key, required this.updater, required this.child});
 
   final AppUpdater updater;
-  final GlobalKey<NavigatorState> navigatorKey;
   final Widget child;
 
   @override
@@ -28,6 +23,7 @@ class AppUpdateGate extends StatefulWidget {
 
 class _AppUpdateGateState extends State<AppUpdateGate> {
   bool _started = false;
+  AppUpdate? _update;
 
   @override
   void initState() {
@@ -50,18 +46,30 @@ class _AppUpdateGateState extends State<AppUpdateGate> {
       if (skipped == update.release.versionCode) return;
     }
 
-    // Context milik Navigator sendiri tidak punya leluhur Navigator; overlay
-    // adalah anak Navigator sehingga showDialog dapat menemukannya.
-    final overlayContext = widget.navigatorKey.currentState?.overlay?.context;
-    if (overlayContext == null || !mounted || !overlayContext.mounted) return;
+    if (!mounted) return;
+    setState(() => _update = update);
+  }
 
-    await showDialog<void>(
-      context: overlayContext,
-      barrierDismissible: !update.forced,
-      builder: (_) => AppUpdateDialog(update: update, updater: widget.updater),
-    );
+  void _hide() {
+    if (!mounted) return;
+    setState(() => _update = null);
   }
 
   @override
-  Widget build(BuildContext context) => widget.child;
+  Widget build(BuildContext context) {
+    final update = _update;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        widget.child,
+        if (update != null)
+          AppUpdateDialog(
+            update: update,
+            updater: widget.updater,
+            onDismiss: update.forced ? null : _hide,
+            onInstalled: _hide,
+          ),
+      ],
+    );
+  }
 }
