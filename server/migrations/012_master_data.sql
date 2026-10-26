@@ -23,9 +23,11 @@ INSERT INTO divisions(code, label) VALUES
 ON CONFLICT (code) DO NOTHING;
 
 -- Divisi lama di luar daftar resmi tetap dipertahankan agar data karyawan
--- tidak kehilangan rujukan.
+-- tidak kehilangan rujukan. Nilai yang tidak memenuhi format kode dilewati
+-- agar migrasi tidak gagal; server memakai nilai mentah sebagai label.
 INSERT INTO divisions(code, label)
-SELECT DISTINCT division, division FROM users WHERE btrim(division) <> ''
+SELECT DISTINCT division, division FROM users
+WHERE btrim(division) <> '' AND division ~ '^[a-z][A-Za-z0-9]{1,39}$'
 ON CONFLICT (code) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS positions (
