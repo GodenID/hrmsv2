@@ -3,6 +3,10 @@
 -- semua baca username/email crash. Aplikasi selalu lower-case di semua
 -- batas, jadi TEXT + UNIQUE setara dan aman.
 ALTER TABLE users DROP CONSTRAINT IF EXISTS users_manager_username_fkey;
+-- 012 menghapus kolom ini; migrasi dijalankan ulang tiap deploy, jadi
+-- kembalikan dulu sebagai kolom kosong supaya ALTER di bawah tidak gagal.
+-- 012 akan menghapusnya lagi di akhir rangkaian.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS manager_username TEXT;
 ALTER TABLE users
   ALTER COLUMN username TYPE TEXT,
   ALTER COLUMN email TYPE TEXT,
