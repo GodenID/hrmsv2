@@ -287,6 +287,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
                     label: 'Tanggal',
                     value: DateFormatId.dateRange(e.startDate, e.endDate),
                   ),
+                  InfoRow(label: 'Entity', value: e.entity?.name ?? '—'),
                   InfoRow(label: 'Perusahaan', value: e.company),
                   InfoRow(label: 'Kategori event', value: e.category.name),
                   InfoRow(label: 'Lokasi acara', value: e.location),

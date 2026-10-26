@@ -7,7 +7,8 @@ import 'auth_repository.dart';
 ///
 /// - Semua role: melihat event & mendaftarkan diri sebagai crew.
 /// - Manager & Super Admin: membuat, mengubah & menghapus event; mengelola
-///   daftar kategori event; mengatur ambang nilai PO (kecil/sedang/besar).
+///   daftar kategori event; menambah entity event; mengatur ambang nilai PO
+///   (kecil/sedang/besar).
 /// - Nilai PO terlihat semua role (keputusan produk).
 /// - Server mengingatkan crew pada hari-H event berlangsung.
 ///
@@ -38,6 +39,13 @@ abstract class EventRepository {
   /// tersisa.
   Future<void> deleteCategory(AuthUser actor, {required String id});
 
+  /// Semua entity event (pilihan pada formulir). Semua role boleh melihat.
+  Future<List<EventEntity>> fetchEntities(AuthUser viewer);
+
+  /// Menambah entity baru — Manager & Super Admin. Nama wajib unik
+  /// (abaikan kapitalisasi).
+  Future<EventEntity> createEntity(AuthUser actor, {required String name});
+
   /// Semua event, terdekat lebih dulu (urut tanggal mulai).
   Future<List<EventItem>> fetchEvents(AuthUser viewer);
 
@@ -49,6 +57,7 @@ abstract class EventRepository {
     required String name,
     required String company,
     required String categoryId,
+    required String entityId,
     required DateTime startDate,
     required DateTime endDate,
     required String location,
@@ -61,6 +70,7 @@ abstract class EventRepository {
     required String name,
     required String company,
     required String categoryId,
+    required String entityId,
     required DateTime startDate,
     required DateTime endDate,
     required String location,
@@ -183,6 +193,21 @@ class EventCategory {
   final String name;
 }
 
+/// Entity penyelenggara event (mis. PT Prasasti Group). Dibuat Manager &
+/// Super Admin langsung dari formulir event, lalu dipilih per event.
+class EventEntity {
+  const EventEntity({required this.id, required this.name});
+
+  final String id;
+  final String name;
+
+  @override
+  bool operator ==(Object other) => other is EventEntity && other.id == id;
+
+  @override
+  int get hashCode => id.hashCode;
+}
+
 class EventItem {
   const EventItem({
     required this.id,
@@ -195,6 +220,7 @@ class EventItem {
     required this.size,
     required this.createdBy,
     required this.crew,
+    this.entity,
     this.poValue,
   });
 
@@ -205,6 +231,10 @@ class EventItem {
   final String company;
 
   final EventCategory category;
+
+  /// Entity pemilik event; null untuk event lama yang dibuat sebelum entity
+  /// ada.
+  final EventEntity? entity;
 
   /// Tanggal mulai. Event 1 hari: [endDate] sama dengan ini.
   final DateTime startDate;

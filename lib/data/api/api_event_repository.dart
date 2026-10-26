@@ -74,6 +74,7 @@ class ApiEventRepository implements EventRepository {
 
   EventItem _item(Map<String, dynamic> m) {
     final cat = _map(m['category']);
+    final ent = m['entity'] == null ? null : _map(m['entity']);
     return EventItem(
       id: (m['id'] ?? '').toString(),
       name: (m['name'] ?? '').toString(),
@@ -82,6 +83,12 @@ class ApiEventRepository implements EventRepository {
         id: (cat['id'] ?? '').toString(),
         name: (cat['name'] ?? '').toString(),
       ),
+      entity: ent == null
+          ? null
+          : EventEntity(
+              id: (ent['id'] ?? '').toString(),
+              name: (ent['name'] ?? '').toString(),
+            ),
       startDate: apiDateTime(m['startDate']),
       endDate: apiDateTime(m['endDate']),
       location: (m['location'] ?? '').toString(),
@@ -180,6 +187,47 @@ class ApiEventRepository implements EventRepository {
   }
 
   @override
+  Future<List<EventEntity>> fetchEntities(AuthUser viewer) async {
+    final res = await _client.get(
+      Uri.parse('$_base/events/entities'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    return List<EventEntity>.unmodifiable(
+      [
+        for (final e in (m['entities'] as List? ?? []))
+          if ((_map(e)['active'] as bool?) ?? true)
+            EventEntity(
+              id: (_map(e)['id'] ?? '').toString(),
+              name: (_map(e)['name'] ?? '').toString(),
+            ),
+      ],
+    );
+  }
+
+  @override
+  Future<EventEntity> createEntity(
+    AuthUser actor, {
+    required String name,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/events/entities'),
+      headers: await _h(),
+      body: jsonEncode({'name': name}),
+    );
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      _throw(res.body, res.statusCode);
+    }
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    _ping();
+    return EventEntity(
+      id: (m['id'] ?? '').toString(),
+      name: (m['name'] ?? '').toString(),
+    );
+  }
+
+  @override
   Future<List<EventItem>> fetchEvents(AuthUser viewer) async {
     final res = await _client.get(
       Uri.parse('$_base/events'),
@@ -206,6 +254,7 @@ class ApiEventRepository implements EventRepository {
     required String name,
     required String company,
     required String categoryId,
+    required String entityId,
     required DateTime startDate,
     required DateTime endDate,
     required String location,
@@ -215,6 +264,7 @@ class ApiEventRepository implements EventRepository {
         'name': name,
         'company': company,
         'categoryId': categoryId,
+        'entityId': entityId,
         'startDate': startDate.toIso8601String().substring(0, 10),
         'endDate': endDate.toIso8601String().substring(0, 10),
         'location': location,
@@ -227,6 +277,7 @@ class ApiEventRepository implements EventRepository {
     required String name,
     required String company,
     required String categoryId,
+    required String entityId,
     required DateTime startDate,
     required DateTime endDate,
     required String location,
@@ -239,6 +290,7 @@ class ApiEventRepository implements EventRepository {
         name: name,
         company: company,
         categoryId: categoryId,
+        entityId: entityId,
         startDate: startDate,
         endDate: endDate,
         location: location,
@@ -259,6 +311,7 @@ class ApiEventRepository implements EventRepository {
     required String name,
     required String company,
     required String categoryId,
+    required String entityId,
     required DateTime startDate,
     required DateTime endDate,
     required String location,
@@ -271,6 +324,7 @@ class ApiEventRepository implements EventRepository {
         name: name,
         company: company,
         categoryId: categoryId,
+        entityId: entityId,
         startDate: startDate,
         endDate: endDate,
         location: location,

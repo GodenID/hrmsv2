@@ -81,6 +81,7 @@ class _EventListPageState extends State<EventListPage> {
       e.company,
       e.location,
       e.category.name,
+      if (e.entity != null) e.entity!.name,
     ].any((v) => v.toLowerCase().contains(q));
   }
 
@@ -328,6 +329,7 @@ class _EventRow extends StatelessWidget {
           '${e.name}, ${e.company}. '
           '${DateFormatId.dateRange(e.startDate, e.endDate)}. '
           '${e.location}. ${e.category.name}. '
+          '${e.entity == null ? '' : 'Entity ${e.entity!.name}. '}'
           '${e.crew.length} partisipan. Ukuran ${e.size.label}.'
           '${myRole == null ? '' : ' Anda terdaftar sebagai $myRole.'}',
       excludeSemantics: true,
@@ -387,6 +389,7 @@ class _EventRow extends StatelessWidget {
                         const SizedBox(width: 4),
                         Expanded(
                           child: Text(
+                            '${e.entity == null ? '' : '${e.entity!.name} · '}'
                             '${e.company} · ${e.category.name}',
                             style: textTheme.bodySmall?.copyWith(
                               fontSize: 12.5,

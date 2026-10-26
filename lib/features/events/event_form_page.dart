@@ -25,6 +25,7 @@ class EventFormPage extends StatefulWidget {
 
 class _EventFormPageState extends State<EventFormPage> {
   final _formKey = GlobalKey<FormState>();
+  final _entityFieldKey = GlobalKey<FormFieldState<EventEntity>>();
   late final TextEditingController _nameController;
   late final TextEditingController _companyController;
   late final TextEditingController _locationController;
@@ -37,6 +38,9 @@ class _EventFormPageState extends State<EventFormPage> {
   String? _endError;
   EventCategory? _category;
   List<EventCategory>? _categories;
+  EventEntity? _entity;
+  List<EventEntity>? _entities;
+  bool _addingEntity = false;
   EventThresholds? _thresholds;
   String? _error;
   bool _isSubmitting = false;
@@ -56,6 +60,7 @@ class _EventFormPageState extends State<EventFormPage> {
     _startDate = e?.startDate;
     // Event 1 hari: selesai sama dengan mulai.
     _endDate = e?.endDate;
+    _entity = e?.entity;
     // Pratinjau ukuran diperbarui saat nilai PO diketik.
     _poController.addListener(() => setState(() {}));
   }
@@ -67,6 +72,7 @@ class _EventFormPageState extends State<EventFormPage> {
     _initialized = true;
     _loadThresholds();
     _loadCategories();
+    _loadEntities();
   }
 
   Future<void> _loadThresholds() async {
@@ -97,6 +103,115 @@ class _EventFormPageState extends State<EventFormPage> {
       if (mounted) {
         setState(() => _error = 'Daftar kategori gagal dimuat. Coba lagi.');
       }
+    }
+  }
+
+  Future<void> _loadEntities() async {
+    try {
+      final list = await AppScope.of(context).events.fetchEntities(
+            SessionScope.userOf(context),
+          );
+      if (!mounted) return;
+      setState(() {
+        _entities = list;
+        // Samakan dengan entity event yang sedang diubah berdasarkan id.
+        final current = _entity;
+        if (current != null) {
+          for (final e in list) {
+            if (e.id == current.id) _entity = e;
+          }
+        }
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Daftar entity gagal dimuat. Coba lagi.');
+      }
+    }
+  }
+
+  /// Entity aktif + entity event ini walau sudah dinonaktifkan.
+  List<EventEntity> get _entityOptions {
+    final out = [...?_entities];
+    final current = _entity;
+    if (current != null && !out.contains(current)) out.add(current);
+    out.sort(
+      (a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()),
+    );
+    return out;
+  }
+
+  Future<String?> _askEntityName() {
+    final controller = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      builder: (context) => ValueListenableBuilder<TextEditingValue>(
+        valueListenable: controller,
+        builder: (context, value, _) {
+          final name = value.text.trim();
+          final valid = name.length >= 2 && name.length <= 80;
+          return AlertDialog(
+            title: const Text('Tambah entity'),
+            content: TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 80,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nama entity',
+                hintText: 'mis. PT Prasasti Group',
+                helperText: 'Entity bisa dipakai ulang untuk event lain.',
+              ),
+              onSubmitted: valid
+                  ? (_) => Navigator.of(context).pop(name)
+                  : null,
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Batal'),
+              ),
+              FilledButton(
+                onPressed: valid
+                    ? () => Navigator.of(context).pop(name)
+                    : null,
+                child: const Text('Tambah'),
+              ),
+            ],
+          );
+        },
+      ),
+    ).whenComplete(controller.dispose);
+  }
+
+  Future<void> _addEntity() async {
+    if (_addingEntity) return;
+    final name = await _askEntityName();
+    if (name == null || !mounted) return;
+    setState(() {
+      _addingEntity = true;
+      _error = null;
+    });
+    try {
+      final created = await AppScope.of(context).events.createEntity(
+            SessionScope.userOf(context),
+            name: name,
+          );
+      if (!mounted) return;
+      setState(() {
+        _entities = [...?_entities, created];
+        _entity = created;
+      });
+      _entityFieldKey.currentState?.didChange(created);
+    } on AppException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) {
+        setState(
+          () => _error = 'Tidak dapat terhubung ke server. Periksa koneksi Anda lalu coba lagi.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _addingEntity = false);
     }
   }
 
@@ -175,7 +290,8 @@ class _EventFormPageState extends State<EventFormPage> {
         _startDate == null ||
         _endDate == null ||
         _endError != null ||
-        _category == null) {
+        _category == null ||
+        _entity == null) {
       return;
     }
 
@@ -192,6 +308,7 @@ class _EventFormPageState extends State<EventFormPage> {
           name: _nameController.text,
           company: _companyController.text,
           categoryId: _category!.id,
+          entityId: _entity!.id,
           startDate: _startDate!,
           endDate: _endDate!,
           location: _locationController.text,
@@ -203,6 +320,7 @@ class _EventFormPageState extends State<EventFormPage> {
           name: _nameController.text,
           company: _companyController.text,
           categoryId: _category!.id,
+          entityId: _entity!.id,
           startDate: _startDate!,
           endDate: _endDate!,
           location: _locationController.text,
@@ -281,6 +399,52 @@ class _EventFormPageState extends State<EventFormPage> {
                   hintText: 'mis. PT Maju Bersama',
                   prefixIcon: Icon(Icons.business_outlined, size: 20),
                 ),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            LabeledField(
+              label: 'Entity',
+              child: DropdownButtonFormField<EventEntity>(
+                key: _entityFieldKey,
+                initialValue: _entity,
+                isExpanded: true,
+                items: [
+                  for (final entity in _entityOptions)
+                    DropdownMenuItem(
+                      value: entity,
+                      child: Text(
+                        entity.name,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: !_isSubmitting && _entities != null
+                    ? (v) => setState(() => _entity = v)
+                    : null,
+                validator: (v) => v == null ? 'Pilih entity event' : null,
+                decoration: InputDecoration(
+                  hintText: _entities == null
+                      ? 'Memuat entity…'
+                      : 'Pilih entity',
+                  prefixIcon: const Icon(
+                    Icons.account_balance_outlined,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _isSubmitting || _addingEntity ? null : _addEntity,
+                icon: _addingEntity
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.add, size: 18),
+                label: const Text('Tambah entity baru'),
               ),
             ),
             const SizedBox(height: AppSpacing.sm),

@@ -106,12 +106,26 @@ Router eventRouter(Db db, Config cfg) {
     final cat = catRs.isEmpty
         ? {'id': e['category_id'], 'name': e['category_id']}
         : catRs.first.toColumnMap();
+    Map<String, dynamic>? entity;
+    if (e['entity_id'] != null) {
+      final entRs = await tx.execute(
+          Sql.named('SELECT id, name FROM event_entities WHERE id=@i::uuid'),
+          parameters: {'i': (e['entity_id'] as Object).toString()});
+      if (entRs.isNotEmpty) {
+        final m = entRs.first.toColumnMap();
+        entity = {
+          'id': (m['id'] as Object).toString(),
+          'name': m['name'],
+        };
+      }
+    }
     final po = (e['po_value'] as num).toInt();
     return {
       'id': (e['id'] as Object).toString(),
       'name': e['name'],
       'company': e['company'],
       'category': {'id': cat['id'], 'name': cat['name']},
+      'entity': entity,
       'startDate': (e['start_date'] as DateTime).toIso8601String().substring(0, 10),
       'endDate': (e['end_date'] as DateTime).toIso8601String().substring(0, 10),
       'location': e['location'],
@@ -258,6 +272,57 @@ Router eventRouter(Db db, Config cfg) {
     }
   });
 
+  // ---------- entity ----------
+  r.get('/events/entities', (Request req) async {
+    try {
+      await me(req);
+      final rows = await db.pool.runTx((tx) => tx.execute(
+          Sql.named('SELECT id, name, active FROM event_entities ORDER BY name')));
+      return json({
+        'entities': [
+          for (final row in rows)
+            {
+              'id': (row.toColumnMap()['id'] as Object).toString(),
+              'name': row.toColumnMap()['name'],
+              'active': row.toColumnMap()['active'],
+            }
+        ]
+      });
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.post('/events/entities', (Request req) async {
+    try {
+      final actor = await me(req);
+      if (!canManage(actor['role'] as String)) {
+        throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat menambah entity.');
+      }
+      final b = await readJson(req);
+      final name = ((b['name'] ?? '') as String).trim();
+      if (name.length < 2) throw const _Http(422, 'Nama entity minimal 2 karakter.');
+      if (name.length > 80) throw const _Http(422, 'Nama entity maksimal 80 karakter.');
+      final saved = await db.pool.runTx((tx) async {
+        final dup = await tx.execute(Sql.named(
+          'SELECT id FROM event_entities WHERE LOWER(BTRIM(name))=LOWER(@n)',
+        ), parameters: {'n': name});
+        if (dup.isNotEmpty) throw _Http(409, 'Entity "$name" sudah ada.');
+        final ins = await tx.execute(Sql.named(
+          'INSERT INTO event_entities(name) VALUES(@n) RETURNING id, name, active',
+        ), parameters: {'n': name});
+        return ins.first.toColumnMap();
+      });
+      return json({
+        'id': (saved['id'] as Object).toString(),
+        'name': saved['name'],
+        'active': saved['active'],
+      }, status: 201);
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
   // ---------- event ----------
   Future<void> ensureToday(TxSession tx, String viewer, List<Map<String, dynamic>> evs) async {
     final today = dateOnly(nowWib());
@@ -333,10 +398,20 @@ Router eventRouter(Db db, Config cfg) {
         parameters: {'i': ((b['categoryId'] ?? '') as String)});
     if (cat.isEmpty) throw const _Http(422, 'Kategori event tidak dikenal.');
     String s(String k) => ((b[k] ?? '') as String).trim();
+    // Entity opsional di server agar aplikasi versi lama tetap bisa menyimpan
+    // event; formulir baru selalu mengirim entityId.
+    final entityId = s('entityId');
+    if (entityId.isNotEmpty) {
+      final ent = await tx.execute(
+          Sql.named('SELECT id FROM event_entities WHERE id=@i::uuid'),
+          parameters: {'i': entityId});
+      if (ent.isEmpty) throw const _Http(422, 'Entity event tidak dikenal.');
+    }
     final params = <String, dynamic>{
       'n': s('name'),
       'c': s('company'),
       'cat': s('categoryId'),
+      'ent': entityId.isEmpty ? null : entityId,
       'sd': dateOnly(DateTime.parse(b['startDate'] as String)).toIso8601String().substring(0, 10),
       'ed': dateOnly(DateTime.parse(b['endDate'] as String)).toIso8601String().substring(0, 10),
       'l': s('location'),
@@ -345,14 +420,15 @@ Router eventRouter(Db db, Config cfg) {
     };
     if (id == null) {
       final ins = await tx.execute(Sql.named('''
-        INSERT INTO events(name, company, category_id, start_date, end_date, location, po_value, created_by)
-        VALUES(@n,@c,@cat,@sd,@ed,@l,@po,@by) RETURNING *
+        INSERT INTO events(name, company, category_id, entity_id, start_date, end_date, location, po_value, created_by)
+        VALUES(@n,@c,@cat,@ent::uuid,@sd,@ed,@l,@po,@by) RETURNING *
       '''), parameters: params);
       return ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
     }
     final upd = await tx.execute(Sql.named('''
-      UPDATE events SET name=@n, company=@c, category_id=@cat, start_date=@sd,
-        end_date=@ed, location=@l, po_value=@po WHERE id=@i::uuid RETURNING *
+      UPDATE events SET name=@n, company=@c, category_id=@cat, entity_id=@ent::uuid,
+        start_date=@sd, end_date=@ed, location=@l, po_value=@po
+      WHERE id=@i::uuid RETURNING *
     '''), parameters: {...params, 'i': id});
     if (upd.isEmpty) {
       throw const _Http(404, 'Event tidak ditemukan. Mungkin sudah dihapus.');
