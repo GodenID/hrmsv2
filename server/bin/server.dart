@@ -5,6 +5,7 @@ import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_cors_headers/shelf_cors_headers.dart';
 
 import 'package:prasasti_server/announcement_handlers.dart';
+import 'package:prasasti_server/app_handlers.dart';
 import 'package:prasasti_server/attendance_handlers.dart';
 import 'package:prasasti_server/auth_handlers.dart';
 import 'package:prasasti_server/event_handlers.dart';
@@ -66,6 +67,7 @@ Future<void> main() async {
   final ann = announcementRouter(db, cfg);
   final ev = eventRouter(db, cfg);
   final warn = warningRouter(db, cfg);
+  final appR = appRouter(db, cfg);
   final app = const Pipeline()
       .addMiddleware(logRequests())
       .addMiddleware(corsHeaders())
@@ -83,6 +85,7 @@ Future<void> main() async {
     if (p.startsWith('announcements')) return ann.call(req);
     if (p.startsWith('events')) return ev.call(req);
     if (p.startsWith('warnings')) return warn.call(req);
+    if (p.startsWith('app/')) return appR.call(req);
     return auth.call(req);
   });
 

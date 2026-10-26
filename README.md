@@ -49,6 +49,10 @@ karyawan, event, pengumuman, dan surat peringatan dalam satu genggaman.**
 - Pengumuman terjadwal, tersasar divisi, laporan pembaca
 - SP 1–3: eskalasi, tanda tangan, sanggahan, pencabutan
 
+**🔄 Pembaruan Otomatis**
+- Cek versi tiap aplikasi dibuka, unduh APK, verifikasi SHA-256
+- Pemasangan sekali ketuk; mode wajib untuk versi di bawah minimum
+
 </td>
 </tr>
 </table>
@@ -139,6 +143,36 @@ Tanpa env S3, upload file nonaktif secara anggun (lampiran tercatat sebagai meta
 
 > 🛡️ `.env` asli, `*.jks`, dan `key.properties` **tidak pernah di-commit**
 > (sudah di-`.gitignore`). Mulai dari `server/.env.example`.
+
+---
+
+## 🔄 Rilis & Pembaruan Otomatis
+
+Aplikasi memanggil `GET /app/version` setiap dibuka. Bila ada versi baru, APK
+diunduh di dalam aplikasi, checksum SHA-256 diverifikasi, lalu pemasang
+Android dibuka. Karyawan hanya menekan **Install** sekali — tidak perlu lagi
+mengirim berkas ke grup.
+
+1. Naikkan versi di `pubspec.yaml`: `version: 1.0.1+2`. Build number **wajib**
+   bertambah tiap rilis.
+2. Build APK release: `flutter build apk --release`
+3. Terbitkan:
+
+```powershell
+.\tool\publish_release.ps1 `
+  -BaseUrl https://apihrms.prasastigroup.id `
+  -Username admin `
+  -Apk .\build\app\outputs\flutter-apk\app-release.apk `
+  -VersionCode 2 -VersionName 1.0.1 `
+  -Notes "Perbaikan absensi dan notifikasi."
+```
+
+Tambahkan `-MinVersionCode 2` untuk memaksa semua pengguna versi lama
+memperbarui sebelum bisa memakai aplikasi.
+
+> ⚠️ APK tiap rilis harus ditandatangani **keystore yang sama**. Beda
+> keystore membuat Android menolak memasang di atas aplikasi lama.
+> Jalur ini khusus Android; iOS tetap lewat TestFlight/App Store.
 
 ---
 

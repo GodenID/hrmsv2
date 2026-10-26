@@ -20,6 +20,7 @@ import '../data/notification_repository.dart';
 import '../data/overtime_repository.dart';
 import '../data/profile_repository.dart';
 import '../data/warning_repository.dart';
+import 'app_update.dart';
 import 'platform_services.dart';
 import 'session_storage.dart';
 
@@ -36,6 +37,7 @@ class AppDependencies {
     required this.employees,
     required this.notifications,
     required this.warnings,
+    required this.updater,
     required this.sessionStorage,
     this.platform = const PlatformServices(),
   });
@@ -63,15 +65,13 @@ class AppDependencies {
       overtime: ApiOvertimeRepository(baseUrl: baseUrl, sessionStorage: store),
       events: ApiEventRepository(baseUrl: baseUrl, sessionStorage: store),
       profile: ApiProfileRepository(baseUrl: baseUrl, sessionStorage: store),
-      employees: ApiEmployeeRepository(
-        baseUrl: baseUrl,
-        sessionStorage: store,
-      ),
+      employees: ApiEmployeeRepository(baseUrl: baseUrl, sessionStorage: store),
       notifications: ApiNotificationRepository(
         baseUrl: baseUrl,
         sessionStorage: store,
       ),
       warnings: ApiWarningRepository(baseUrl: baseUrl, sessionStorage: store),
+      updater: AppUpdater(baseUrl: baseUrl),
       sessionStorage: store,
       platform: platform,
     );
@@ -87,6 +87,7 @@ class AppDependencies {
   final EmployeeRepository employees;
   final NotificationRepository notifications;
   final WarningRepository warnings;
+  final AppUpdater updater;
   final SessionStorage sessionStorage;
   final PlatformServices platform;
 }

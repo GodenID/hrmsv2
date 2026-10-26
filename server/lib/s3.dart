@@ -145,6 +145,27 @@ class S3Store {
     }
   }
 
+  /// Ukuran objek dalam byte, atau null bila tidak ada / gagal dibaca.
+  /// Dipakai memvalidasi APK rilis sebelum diterbitkan.
+  Future<int?> sizeOf(String key) async {
+    final client = HttpClient();
+    try {
+      final req = await client.openUrl(
+          'HEAD', Uri.parse('https://${_hostFor()}${_uriFor(key)}'));
+      const empty =
+          'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
+      _authHeaders('HEAD', key, empty).forEach(req.headers.set);
+      final res = await req.close();
+      await res.drain();
+      if (res.statusCode != 200) return null;
+      return res.contentLength >= 0 ? res.contentLength : null;
+    } catch (_) {
+      return null;
+    } finally {
+      client.close();
+    }
+  }
+
   /// Hapus objek (bersih-bersih avatar lama). Gagal = diabaikan.
   Future<void> delete(String key) async {
     final client = HttpClient();

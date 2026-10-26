@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Jalur berkas yang boleh dibagikan lewat FileProvider.
+     APK pembaruan disimpan di files/updates/ (application support dir). -->
+<paths>
+    <files-path name="files" path="." />
+    <cache-path name="cache" path="." />
+</paths>

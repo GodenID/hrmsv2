@@ -11,6 +11,7 @@ import 'features/auth/forgot_password_page.dart';
 import 'features/auth/login_page.dart';
 import 'features/auth/startup_page.dart';
 import 'features/shell/app_shell.dart';
+import 'features/update/update_gate.dart';
 
 class PrasastiConnectApp extends StatelessWidget {
   const PrasastiConnectApp({super.key, required this.dependencies});
@@ -26,6 +27,12 @@ class PrasastiConnectApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         scaffoldMessengerKey: PushNotifications.messengerKey,
         navigatorKey: PushNotifications.navigatorKey,
+        // Cek pembaruan tepat saat aplikasi dibuka, di atas halaman apa pun.
+        builder: (context, child) => AppUpdateGate(
+          updater: dependencies.updater,
+          navigatorKey: PushNotifications.navigatorKey,
+          child: child ?? const SizedBox.shrink(),
+        ),
         theme: AppTheme.light(),
         // Kalender, pemilih jam, dan teks bawaan Material dalam Bahasa
         // Indonesia.

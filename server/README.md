@@ -130,3 +130,18 @@ Sisa mock: announcements, events, warnings.
 
 Mode API kini 100% server. `AppDependencies.mock` tersisa untuk
 pengujian saja. Siap deploy Coolify.
+
+## Fase 8 - rilis aplikasi (pembaruan otomatis)
+
+- `GET /app/version` (publik, tanpa auth) > versi Android terbaru:
+  `versionCode`, `versionName`, `minVersionCode`, `sha256`, `sizeBytes`,
+  `notes`, `apkUrl` presigned 1 jam. `{"available":false}` bila belum ada
+  rilis atau S3 mati.
+- `GET /app/releases` (superadmin) > riwayat rilis.
+- `POST /app/releases` (superadmin) > terbitkan versi. `versionCode` wajib
+  lebih besar dari yang sudah terbit; server memverifikasi objek APK ada di
+  S3 dan mencatat ukuran aslinya.
+- `POST /uploads/presign` purpose `apk` (superadmin, `.apk`, maks 300 MB,
+  URL berlaku 1 jam) > key `releases/...`.
+- Alat terbit dari PC: `tool/publish_release.ps1` (login > presign > unggah >
+  catat rilis).

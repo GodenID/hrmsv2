@@ -62,33 +62,59 @@ Router uploadRouter(Db db, Config cfg) {
       final purpose = ((b['purpose'] ?? '') as String);
       final filename = ((b['filename'] ?? '') as String).trim();
       final size = (b['size'] as num?)?.toInt() ?? 0;
-      if (purpose != 'leave' && purpose != 'avatar' && purpose != 'announcement') {
+      if (purpose != 'leave' &&
+          purpose != 'avatar' &&
+          purpose != 'announcement' &&
+          purpose != 'apk') {
         throw const _Http(422, 'Tujuan upload tidak dikenal.');
       }
+      if (purpose == 'apk' && u['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat mengunggah APK.');
+      }
       final ext = filename.split('.').last.toLowerCase();
-      final maxBytes = purpose == 'announcement' ? 5 * 1024 * 1024 : maxFileBytes;
-      final allowed = purpose == 'avatar' ? avatarExts : leaveExts;
+      const apkExts = {'apk'};
+      final maxBytes = switch (purpose) {
+        'announcement' => 5 * 1024 * 1024,
+        'apk' => 300 * 1024 * 1024,
+        _ => maxFileBytes,
+      };
+      final allowed = switch (purpose) {
+        'avatar' => avatarExts,
+        'apk' => apkExts,
+        _ => leaveExts,
+      };
       if (!allowed.contains(ext)) {
-        throw _Http(422,
-            purpose == 'avatar' ? 'Foto harus PNG atau JPG.' : 'Lampiran harus PDF / JPG / PNG.');
+        throw _Http(422, switch (purpose) {
+          'avatar' => 'Foto harus PNG atau JPG.',
+          'apk' => 'Berkas rilis harus .apk.',
+          _ => 'Lampiran harus PDF / JPG / PNG.',
+        });
       }
       if (size <= 0 || size > maxBytes) {
-        throw _Http(422,
-            purpose == 'announcement' ? 'Ukuran file maksimal 5 MB.' : 'Ukuran file maksimal 2 MB.');
+        throw _Http(422, switch (purpose) {
+          'announcement' => 'Ukuran file maksimal 5 MB.',
+          'apk' => 'Ukuran APK maksimal 300 MB.',
+          _ => 'Ukuran file maksimal 2 MB.',
+        });
       }
       final uname = (u['username'] as String).toLowerCase();
       final token = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
-      final key = purpose == 'leave'
-          ? 'leave/$uname/$token.$ext'
-          : purpose == 'avatar'
-              ? 'avatars/$uname/$token.$ext'
-              : 'announcements/$uname/$token.$ext';
-      final putUrl = s3.presignPut(key);
+      final key = switch (purpose) {
+        'leave' => 'leave/$uname/$token.$ext',
+        'avatar' => 'avatars/$uname/$token.$ext',
+        'apk' => 'releases/$token.apk',
+        _ => 'announcements/$uname/$token.$ext',
+      };
+      // APK besar butuh waktu unggah lebih lama dari lampiran biasa.
+      final putUrl = s3.presignPut(
+        key,
+        expiresSeconds: purpose == 'apk' ? 3600 : 900,
+      );
       return json({
         'key': key,
         'putUrl': putUrl,
         'publicUrl': purpose == 'avatar' && cfg.s3avatarPublic ? s3.publicUrl(key) : null,
-        'expiresIn': 900,
+        'expiresIn': purpose == 'apk' ? 3600 : 900,
       });
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
