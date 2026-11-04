@@ -87,6 +87,7 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
     final e = _employee;
     final changed = await showLeaveQuotaDialog(
       context,
+      actor: SessionScope.userOf(context),
       username: e.username,
       fullName: e.fullName,
     );

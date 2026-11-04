@@ -12,21 +12,32 @@ import '../../../data/leave_repository.dart';
 /// Mengembalikan `true` bila ada perubahan, agar pemanggil memuat ulang.
 Future<bool> showLeaveQuotaDialog(
   BuildContext context, {
+  required AuthUser actor,
   required String username,
   required String fullName,
 }) async {
   final changed = await showDialog<bool>(
     context: context,
     barrierDismissible: false,
-    builder: (context) =>
-        _LeaveQuotaDialog(username: username, fullName: fullName),
+    builder: (context) => _LeaveQuotaDialog(
+      actor: actor,
+      username: username,
+      fullName: fullName,
+    ),
   );
   return changed ?? false;
 }
 
 class _LeaveQuotaDialog extends StatefulWidget {
-  const _LeaveQuotaDialog({required this.username, required this.fullName});
+  const _LeaveQuotaDialog({
+    required this.actor,
+    required this.username,
+    required this.fullName,
+  });
 
+  /// Pemanggil menyerahkan pengguna aktif: dialog berada di atas root
+  /// navigator, di luar [SessionScope] milik shell.
+  final AuthUser actor;
   final String username;
   final String fullName;
 
@@ -67,7 +78,7 @@ class _LeaveQuotaDialogState extends State<_LeaveQuotaDialog> {
     });
     try {
       final quota = await AppScope.of(context).leave.fetchQuota(
-            SessionScope.userOf(context),
+            widget.actor,
             username: widget.username,
           );
       if (mounted) setState(() => _quota = quota);
@@ -108,7 +119,7 @@ class _LeaveQuotaDialogState extends State<_LeaveQuotaDialog> {
     });
     try {
       final updated = await AppScope.of(context).leave.adjustQuota(
-            SessionScope.userOf(context),
+            widget.actor,
             username: widget.username,
             days: -days,
             note: note,
@@ -159,7 +170,7 @@ class _LeaveQuotaDialogState extends State<_LeaveQuotaDialog> {
     });
     try {
       await AppScope.of(context).leave.deleteQuotaAdjustment(
-            SessionScope.userOf(context),
+            widget.actor,
             id: adjustment.id,
           );
       if (!mounted) return;

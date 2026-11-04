@@ -292,8 +292,7 @@ Router leaveRouter(Db db, Config cfg) {
         });
         final row = ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         for (final rev in await reviewersFor(
-            tx, u['username'] as String, u['role'] as String,
-            includeSelfIfSuperadmin: true)) {
+            tx, u['username'] as String, u['role'] as String)) {
           await notifyTx(tx, rev['username'] as String,
               kind: 'reviewRequested',
               title: 'Pengajuan ${typeLabels[type]!.toLowerCase()} baru',
@@ -339,11 +338,10 @@ Router leaveRouter(Db db, Config cfg) {
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
         SELECT l.*, u.username, u.full_name AS efn, u.role AS urel
         FROM leave_requests l JOIN users u ON u.id=l.user_id
-        WHERE l.status<>'cancelled' AND (u.username<>@me OR @sa::boolean) AND u.active
+        WHERE l.status<>'cancelled' AND u.username<>@me AND u.active
         ORDER BY l.submitted_at
       '''), parameters: {
         'me': actor['username'],
-        'sa': actor['role'] == 'superadmin',
       }));
       final pending = <Map<String, dynamic>>[];
       final done = <Map<String, dynamic>>[];
@@ -400,7 +398,7 @@ Router leaveRouter(Db db, Config cfg) {
         if (m['status'] != 'pending') {
           throw _Http(400, 'Pengajuan ini sudah ${m['status']}. Muat ulang untuk melihat status terbaru.');
         }
-        if (m['username'] == actor['username'] && actor['role'] != 'superadmin') {
+        if (m['username'] == actor['username']) {
           throw const _Http(403, 'Anda tidak dapat memproses pengajuan Anda sendiri.');
         }
         if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
@@ -817,8 +815,7 @@ Router overtimeRouter(Db db, Config cfg) {
         });
         final row = ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         for (final rev in await reviewersFor(
-            tx, u['username'] as String, u['role'] as String,
-            includeSelfIfSuperadmin: true)) {
+            tx, u['username'] as String, u['role'] as String)) {
           await notifyTx(tx, rev['username'] as String,
               kind: 'reviewRequested',
               title: 'Pengajuan lembur baru',
@@ -862,11 +859,10 @@ Router overtimeRouter(Db db, Config cfg) {
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
         SELECT o.*, u.username, u.full_name AS efn, u.role AS urel
         FROM overtime_requests o JOIN users u ON u.id=o.user_id
-        WHERE o.status<>'cancelled' AND (u.username<>@me OR @sa::boolean) AND u.active
+        WHERE o.status<>'cancelled' AND u.username<>@me AND u.active
         ORDER BY o.submitted_at
       '''), parameters: {
         'me': actor['username'],
-        'sa': actor['role'] == 'superadmin',
       }));
       final pending = <Map<String, dynamic>>[];
       final done = <Map<String, dynamic>>[];
@@ -912,7 +908,7 @@ Router overtimeRouter(Db db, Config cfg) {
         if (m['status'] != 'pending') {
           throw _Http(400, 'Pengajuan ini sudah ${m['status']}. Muat ulang untuk melihat status terbaru.');
         }
-        if (m['username'] == actor['username'] && actor['role'] != 'superadmin') {
+        if (m['username'] == actor['username']) {
           throw const _Http(403, 'Anda tidak dapat memproses pengajuan Anda sendiri.');
         }
         if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {

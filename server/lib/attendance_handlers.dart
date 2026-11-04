@@ -651,8 +651,7 @@ Router attendanceRouter(Db db, Config cfg) {
         });
         final row = ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         for (final rev in await reviewersFor(
-            tx, u['username'] as String, u['role'] as String,
-            includeSelfIfSuperadmin: true)) {
+            tx, u['username'] as String, u['role'] as String)) {
           await notifyTx(tx, rev['username'] as String,
               kind: 'reviewRequested',
               title: 'Koreksi absensi baru',
@@ -714,7 +713,7 @@ Router attendanceRouter(Db db, Config cfg) {
         if (cur.isEmpty) throw const _Http(404, 'Koreksi tidak ditemukan.');
         final m = cur.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         if (m['status'] != 'pending') throw const _Http(400, 'Koreksi sudah diproses.');
-        if (m['username'] == actor['username'] && actor['role'] != 'superadmin') {
+        if (m['username'] == actor['username']) {
           throw const _Http(403, 'Anda tidak dapat memproses koreksi Anda sendiri.');
         }
         if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
@@ -874,8 +873,7 @@ Router attendanceRouter(Db db, Config cfg) {
         });
         final row = ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         for (final rev in await reviewersFor(
-            tx, u['username'] as String, u['role'] as String,
-            includeSelfIfSuperadmin: true)) {
+            tx, u['username'] as String, u['role'] as String)) {
           await notifyTx(tx, rev['username'] as String,
               kind: 'reviewRequested',
               title: 'Pengajuan luar area baru',
@@ -917,18 +915,13 @@ Router attendanceRouter(Db db, Config cfg) {
         WHERE o.status<>'cancelled' ORDER BY o.submitted_at
       ''')));
       final items = <Map<String, dynamic>>[];
-      final selfApprove =
-          actor['role'] == 'manager' || actor['role'] == 'superadmin';
       for (final row in rows) {
         final m = row.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         final isSelf =
             (m['username'] as String).toLowerCase() ==
             (actor['username'] as String).toLowerCase();
-        // Manager/Super Admin melihat miliknya sendiri untuk disetujui
-        // sendiri; staff tidak.
-        if (isSelf && !selfApprove) continue;
-        if (!isSelf &&
-            !canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
+        if (isSelf) continue;
+        if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
           continue;
         }
         items.add({
@@ -960,15 +953,12 @@ Router attendanceRouter(Db db, Config cfg) {
         if (m['status'] != 'pending') throw const _Http(400, 'Pengajuan sudah diproses.');
         final isSelf = (m['username'] as String).toLowerCase() ==
             (actor['username'] as String).toLowerCase();
-        // Manager & Super Admin boleh menyetujui pengajuannya sendiri
-        // (dinas luar); role lain tidak.
-        if (isSelf &&
-            actor['role'] != 'manager' &&
-            actor['role'] != 'superadmin') {
+        // Tidak ada yang boleh memproses pengajuannya sendiri, termasuk
+        // Manager dan Super Admin.
+        if (isSelf) {
           throw const _Http(403, 'Anda tidak dapat memproses pengajuan Anda sendiri.');
         }
-        if (!isSelf &&
-            !canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
+        if (!canManageRole(actor['role'] as String, (m['urel'] ?? 'staff') as String)) {
           throw const _Http(403, 'Anda tidak berhak memproses pengajuan ini.');
         }
         // Validasi & penulisan SEBELUM status berubah: pengajuan masih
