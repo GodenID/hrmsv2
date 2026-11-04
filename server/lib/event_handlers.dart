@@ -67,6 +67,13 @@ Future<void> ensureEventCrewRoles(Db db) async {
       ('slc', 'SLC', 'Tambahkan keterangan bila perlu', false, 6),
       ('design', 'Design', 'mis. Desain panggung, materi publikasi', false, 7),
     ];
+    // Hanya isi tabel kosong. Bagian yang dihapus Super Admin tidak boleh
+    // muncul lagi setiap server mulai.
+    final count = await tx.execute(
+        Sql.named('SELECT COUNT(*) AS c FROM event_crew_roles'));
+    if (int.parse((count.first.toColumnMap()['c'] as Object).toString()) > 0) {
+      return;
+    }
     for (final seed in seeds) {
       await tx.execute(Sql.named('''
         INSERT INTO event_crew_roles(code, label, note_hint, requires_note, sort_order)
