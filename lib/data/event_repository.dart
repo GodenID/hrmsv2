@@ -60,6 +60,16 @@ abstract class EventRepository {
   /// event (pesan menyebut jumlahnya).
   Future<void> deleteEntity(AuthUser actor, {required String id});
 
+  /// Semua bagian event (Master data), termasuk jumlah partisipan pemakai.
+  Future<List<CrewRole>> fetchCrewRoles(AuthUser actor);
+
+  /// Tambah bagian event baru — Super Admin.
+  Future<CrewRole> createCrewRole(AuthUser actor, {required String label});
+
+  /// Hapus bagian event — Super Admin. Ditolak bila masih dipakai
+  /// partisipan, dan minimal satu bagian harus tersisa.
+  Future<void> deleteCrewRole(AuthUser actor, {required String id});
+
   /// Semua event, terdekat lebih dulu (urut tanggal mulai).
   Future<List<EventItem>> fetchEvents(AuthUser viewer);
 
@@ -107,23 +117,82 @@ abstract class EventRepository {
   Future<EventItem> leaveEvent(AuthUser user, {required String id});
 }
 
-/// Bagian di dalam tim event (urutan sesuai permintaan bisnis).
-enum CrewRole {
-  crew('Crew', 'mis. Crew panggung, crew logistik'),
-  pic('PIC', 'mis. PIC Venue, PIC Talent, PIC Konsumsi'),
-  pm('PM', 'mis. Project manager utama'),
-  sla('SLA', 'Tambahkan keterangan bila perlu'),
-  slb('SLB', 'Tambahkan keterangan bila perlu'),
-  slc('SLC', 'Tambahkan keterangan bila perlu'),
-  design('Design', 'mis. Desain panggung, materi publikasi');
+/// Bagian di dalam tim event. Daftar awalnya tetap, lalu Super Admin dapat
+/// menambah/menghapusnya di Master data. [code] yang disimpan pada crew,
+/// sehingga label aman berubah tanpa memutus keanggotaan.
+class CrewRole {
+  const CrewRole({
+    required this.id,
+    required this.code,
+    required this.label,
+    required this.noteHint,
+    this.requiresNote = false,
+    this.used = 0,
+  });
 
-  const CrewRole(this.label, this.noteHint);
-
+  /// ID baris master data; kosong untuk bagian bawaan yang belum dimuat.
+  final String id;
+  final String code;
   final String label;
   final String noteHint;
 
-  /// PIC wajib menjelaskan PIC bagian apa.
-  bool get requiresNote => this == CrewRole.pic;
+  /// PIC wajib menjelaskan bagian apa; bagian lain tidak.
+  final bool requiresNote;
+
+  /// Jumlah partisipan yang memakai bagian ini (untuk Master data).
+  final int used;
+
+  static const crew = CrewRole(
+    id: '',
+    code: 'crew',
+    label: 'Crew',
+    noteHint: 'mis. Crew panggung, crew logistik',
+  );
+  static const pic = CrewRole(
+    id: '',
+    code: 'pic',
+    label: 'PIC',
+    noteHint: 'mis. PIC Venue, PIC Talent, PIC Konsumsi',
+    requiresNote: true,
+  );
+  static const pm = CrewRole(
+    id: '',
+    code: 'pm',
+    label: 'PM',
+    noteHint: 'mis. Project manager utama',
+  );
+  static const sla = CrewRole(
+    id: '',
+    code: 'sla',
+    label: 'SLA',
+    noteHint: 'Tambahkan keterangan bila perlu',
+  );
+  static const slb = CrewRole(
+    id: '',
+    code: 'slb',
+    label: 'SLB',
+    noteHint: 'Tambahkan keterangan bila perlu',
+  );
+  static const slc = CrewRole(
+    id: '',
+    code: 'slc',
+    label: 'SLC',
+    noteHint: 'Tambahkan keterangan bila perlu',
+  );
+  static const design = CrewRole(
+    id: '',
+    code: 'design',
+    label: 'Design',
+    noteHint: 'mis. Desain panggung, materi publikasi',
+  );
+
+  static const defaults = <CrewRole>[crew, pic, pm, sla, slb, slc, design];
+
+  @override
+  bool operator ==(Object other) => other is CrewRole && other.code == code;
+
+  @override
+  int get hashCode => code.hashCode;
 }
 
 enum EventSize {
@@ -244,6 +313,7 @@ class EventItem {
     required this.crew,
     this.entity,
     this.poValue,
+    this.crewRoles = CrewRole.defaults,
   });
 
   final String id;
@@ -272,6 +342,9 @@ class EventItem {
 
   /// Diurutkan per bagian lalu nama.
   final List<CrewMember> crew;
+
+  /// Bagian tim yang berlaku untuk event ini (master data global).
+  final List<CrewRole> crewRoles;
 
   bool get isMultiDay =>
       startDate.year != endDate.year ||

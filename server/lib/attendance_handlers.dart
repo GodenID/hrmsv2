@@ -676,10 +676,9 @@ Router attendanceRouter(Db db, Config cfg) {
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
         SELECT c.*, u.username, u.full_name, u.role AS urel
         FROM attendance_corrections c JOIN users u ON u.id=c.user_id
-        WHERE c.status<>'cancelled' AND (u.username<>@me OR @sa::boolean) ORDER BY c.submitted_at
+        WHERE c.status<>'cancelled' AND u.username<>@me ORDER BY c.submitted_at
       '''), parameters: {
         'me': actor['username'],
-        'sa': actor['role'] == 'superadmin',
       }));
       final items = <Map<String, dynamic>>[];
       for (final row in rows) {

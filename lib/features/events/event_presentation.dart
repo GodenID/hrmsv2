@@ -38,11 +38,13 @@ class EventSizeChip extends StatelessWidget {
 class CrewRolePicker extends StatelessWidget {
   const CrewRolePicker({
     super.key,
+    required this.roles,
     required this.selected,
     required this.onSelect,
     this.enabled = true,
   });
 
+  final List<CrewRole> roles;
   final CrewRole? selected;
   final ValueChanged<CrewRole> onSelect;
   final bool enabled;
@@ -53,7 +55,7 @@ class CrewRolePicker extends StatelessWidget {
       spacing: AppSpacing.sm,
       runSpacing: AppSpacing.sm,
       children: [
-        for (final role in CrewRole.values)
+        for (final role in roles)
           _RoleChip(
             label: role.label,
             selected: role == selected,

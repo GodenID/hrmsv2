@@ -6,6 +6,7 @@ import '../../core/theme/theme_colors.dart';
 import '../../core/widgets/page_scaffold.dart';
 import '../../core/widgets/panel.dart';
 import '../../data/auth_repository.dart';
+import '../../data/event_repository.dart';
 import '../../data/master_data.dart';
 
 /// Master data organisasi (Super Admin): divisi & jabatan.
@@ -26,6 +27,7 @@ class _MasterDataPageState extends State<MasterDataPage> {
   String? _error;
   List<MasterDivision>? _divisions;
   List<MasterPosition>? _positions;
+  List<CrewRole>? _crewRoles;
 
   @override
   void didChangeDependencies() {
@@ -43,12 +45,15 @@ class _MasterDataPageState extends State<MasterDataPage> {
     });
     try {
       final actor = SessionScope.userOf(context);
+      final events = AppScope.of(context).events;
       final divisions = await _repo.fetchDivisions(actor);
       final positions = await _repo.fetchPositions(actor);
+      final crewRoles = await events.fetchCrewRoles(actor);
       if (!mounted) return;
       setState(() {
         _divisions = divisions;
         _positions = positions;
+        _crewRoles = crewRoles;
       });
     } on AppException catch (e) {
       if (mounted) setState(() => _error = e.message);
@@ -260,6 +265,36 @@ class _MasterDataPageState extends State<MasterDataPage> {
     );
   }
 
+  Future<void> _addCrewRole() async {
+    final label = await _askName(
+      title: 'Tambah bagian event',
+      label: 'Nama bagian',
+      helper: 'Muncul sebagai pilihan bagian pada formulir partisipan event.',
+    );
+    if (label == null || !mounted) return;
+    await _run(
+      () => AppScope.of(context)
+          .events
+          .createCrewRole(SessionScope.userOf(context), label: label),
+      'Bagian "$label" ditambahkan.',
+    );
+  }
+
+  Future<void> _deleteCrewRole(CrewRole r) async {
+    final ok = await _confirmDelete(
+      r.label,
+      'Bagian hanya bisa dihapus bila tidak dipakai partisipan event. '
+      'Pindahkan partisipan ke bagian lain terlebih dahulu.',
+    );
+    if (!ok || !mounted) return;
+    await _run(
+      () => AppScope.of(context)
+          .events
+          .deleteCrewRole(SessionScope.userOf(context), id: r.id),
+      'Bagian "${r.label}" dihapus.',
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PageScaffold(
@@ -270,7 +305,9 @@ class _MasterDataPageState extends State<MasterDataPage> {
       child: AsyncBody(
         isLoading: _loading,
         error: _error,
-        hasData: _divisions != null && _positions != null,
+        hasData: _divisions != null &&
+            _positions != null &&
+            _crewRoles != null,
         onRetry: _load,
         loadingLabel: 'Memuat master data…',
         builder: (context) => Column(
@@ -304,6 +341,22 @@ class _MasterDataPageState extends State<MasterDataPage> {
                 ],
                 if (_positions!.isEmpty)
                   const _EmptyRow('Belum ada jabatan.'),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _section(
+              title: 'Bagian event',
+              hint:
+                  'Pilihan bagian pada formulir partisipan event. '
+                  'Bagian yang masih dipakai tidak bisa dihapus.',
+              onAdd: _addCrewRole,
+              children: [
+                for (var i = 0; i < _crewRoles!.length; i++) ...[
+                  if (i > 0) const Divider(height: 1),
+                  _crewRoleRow(_crewRoles![i]),
+                ],
+                if (_crewRoles!.isEmpty)
+                  const _EmptyRow('Belum ada bagian event.'),
               ],
             ),
             const SizedBox(height: AppSpacing.lg),
@@ -444,6 +497,31 @@ class _MasterDataPageState extends State<MasterDataPage> {
             onDelete: () => _deletePosition(p),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _crewRoleRow(CrewRole r) {
+    final textTheme = Theme.of(context).textTheme;
+    return ListTile(
+      contentPadding: const EdgeInsets.fromLTRB(16, 4, 8, 4),
+      title: Text(
+        r.label,
+        style: textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        [
+          r.code,
+          '${r.used} partisipan',
+          if (r.requiresNote) 'wajib keterangan',
+        ].join(' · '),
+        style: textTheme.bodySmall?.copyWith(fontSize: 12.5),
+      ),
+      trailing: IconButton(
+        tooltip: 'Hapus bagian',
+        onPressed: _busy ? null : () => _deleteCrewRole(r),
+        color: context.danger,
+        icon: const Icon(Icons.delete_outline, size: 20),
       ),
     );
   }

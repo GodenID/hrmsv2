@@ -57,6 +57,7 @@ Future<void> main() async {
   final db = await Db.open(cfg.databaseUrl);
   PushBus.configure(database: db, sender: FcmSender(cfg));
   if (cfg.runMigrations) await runMigrations(db);
+  await ensureEventCrewRoles(db);
 
   final auth = authRouter(db, cfg);
   final emp = employeeRouter(db, cfg);

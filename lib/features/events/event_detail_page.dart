@@ -434,7 +434,11 @@ class _EventDetailPageState extends State<EventDetailPage> {
                 ),
               )
             else
-              _CrewList(crew: e.crew, myUsername: user.username),
+              _CrewList(
+                crew: e.crew,
+                roles: e.crewRoles,
+                myUsername: user.username,
+              ),
           ],
         ),
       ),
@@ -538,16 +542,26 @@ class _MyMembership extends StatelessWidget {
 
 /// Daftar tim dikelompokkan per bagian.
 class _CrewList extends StatelessWidget {
-  const _CrewList({required this.crew, required this.myUsername});
+  const _CrewList({
+    required this.crew,
+    required this.roles,
+    required this.myUsername,
+  });
 
   final List<CrewMember> crew;
+  final List<CrewRole> roles;
   final String myUsername;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    // Bagian yang dihapus tetap ditampilkan bila masih ada anggotanya.
+    final ordered = <CrewRole>[...roles];
+    for (final m in crew) {
+      if (!ordered.contains(m.role)) ordered.add(m.role);
+    }
     final groups = [
-      for (final role in CrewRole.values)
+      for (final role in ordered)
         (
           role,
           [

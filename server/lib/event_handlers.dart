@@ -43,6 +43,46 @@ String classify(int po, Map<String, int> t) {
   return 'overLimit';
 }
 
+/// Pastikan tabel bagian event ada walau migrasi otomatis tidak dijalankan.
+/// Idempoten: aman dipanggil setiap server mulai.
+Future<void> ensureEventCrewRoles(Db db) async {
+  await db.pool.runTx((tx) async {
+    await tx.execute(Sql.named('''
+      CREATE TABLE IF NOT EXISTS event_crew_roles (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        code TEXT NOT NULL UNIQUE,
+        label TEXT NOT NULL,
+        note_hint TEXT NOT NULL DEFAULT 'Tambahkan keterangan bila perlu',
+        requires_note BOOLEAN NOT NULL DEFAULT FALSE,
+        sort_order INT NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    '''));
+    const seeds = [
+      ('crew', 'Crew', 'mis. Crew panggung, crew logistik', false, 1),
+      ('pic', 'PIC', 'mis. PIC Venue, PIC Talent, PIC Konsumsi', true, 2),
+      ('pm', 'PM', 'mis. Project manager utama', false, 3),
+      ('sla', 'SLA', 'Tambahkan keterangan bila perlu', false, 4),
+      ('slb', 'SLB', 'Tambahkan keterangan bila perlu', false, 5),
+      ('slc', 'SLC', 'Tambahkan keterangan bila perlu', false, 6),
+      ('design', 'Design', 'mis. Desain panggung, materi publikasi', false, 7),
+    ];
+    for (final seed in seeds) {
+      await tx.execute(Sql.named('''
+        INSERT INTO event_crew_roles(code, label, note_hint, requires_note, sort_order)
+        VALUES(@c, @l, @h, @r, @s)
+        ON CONFLICT (code) DO NOTHING
+      '''), parameters: {
+        'c': seed.$1,
+        'l': seed.$2,
+        'h': seed.$3,
+        'r': seed.$4,
+        's': seed.$5,
+      });
+    }
+  });
+}
+
 Router eventRouter(Db db, Config cfg) {
   final r = Router();
 
@@ -101,6 +141,10 @@ Router eventRouter(Db db, Config cfg) {
       SELECT username, full_name, role, note, joined_at FROM event_crew
       WHERE event_id=@i::uuid ORDER BY role, full_name
     '''), parameters: {'i': (e['id'] as Object).toString()});
+    final roleRs = await tx.execute(Sql.named('''
+      SELECT id, code, label, note_hint, requires_note
+      FROM event_crew_roles ORDER BY sort_order, label
+    '''));
     final catRs = await tx.execute(Sql.named('SELECT id, name FROM event_categories WHERE id=@i'),
         parameters: {'i': e['category_id']});
     final cat = catRs.isEmpty
@@ -134,6 +178,16 @@ Router eventRouter(Db db, Config cfg) {
       'poValue': po,
       'size': classify(po, thr),
       'createdBy': e['created_by'],
+      'roles': [
+        for (final row in roleRs)
+          {
+            'id': (row.toColumnMap()['id'] as Object).toString(),
+            'code': row.toColumnMap()['code'],
+            'label': row.toColumnMap()['label'],
+            'noteHint': row.toColumnMap()['note_hint'],
+            'requiresNote': row.toColumnMap()['requires_note'],
+          }
+      ],
       'crew': [
         for (final row in crewRs)
           {
@@ -401,6 +455,127 @@ Router eventRouter(Db db, Config cfg) {
     }
   });
 
+  // ---------- bagian crew (Master data) ----------
+  Map<String, dynamic> roleJson(Map<String, dynamic> m, {int used = 0}) => {
+        'id': (m['id'] as Object).toString(),
+        'code': m['code'],
+        'label': m['label'],
+        'noteHint': m['note_hint'],
+        'requiresNote': m['requires_note'],
+        'used': used,
+      };
+
+  r.get('/events/crew-roles', (Request req) async {
+    try {
+      await me(req);
+      final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
+        SELECT r.id, r.code, r.label, r.note_hint, r.requires_note,
+               (SELECT COUNT(*) FROM event_crew c WHERE c.role=r.code) AS used
+        FROM event_crew_roles r ORDER BY r.sort_order, r.label
+      ''')));
+      return json({
+        'roles': [
+          for (final row in rows)
+            roleJson(
+              row.toColumnMap(),
+              used: int.parse(
+                  (row.toColumnMap()['used'] as Object).toString()),
+            )
+        ]
+      });
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.post('/events/crew-roles', (Request req) async {
+    try {
+      final actor = await me(req);
+      if (actor['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat menambah bagian event.');
+      }
+      final b = await readJson(req);
+      final label = ((b['label'] ?? '') as String).trim();
+      if (label.length < 2) throw const _Http(422, 'Nama bagian minimal 2 karakter.');
+      if (label.length > 40) throw const _Http(422, 'Nama bagian maksimal 40 karakter.');
+      final saved = await db.pool.runTx((tx) async {
+        final dup = await tx.execute(Sql.named(
+          'SELECT id FROM event_crew_roles WHERE LOWER(BTRIM(label))=LOWER(@l)',
+        ), parameters: {'l': label});
+        if (dup.isNotEmpty) throw _Http(409, 'Bagian "$label" sudah ada.');
+        final base = label
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]+'), '_')
+            .replaceAll(RegExp(r'^_+|_+$'), '');
+        final prefix = base.isEmpty
+            ? 'bagian'
+            : (base.length > 24 ? base.substring(0, 24) : base);
+        var code = prefix;
+        var n = 1;
+        while (true) {
+          final used = await tx.execute(Sql.named(
+            'SELECT 1 FROM event_crew_roles WHERE code=@c',
+          ), parameters: {'c': code});
+          if (used.isEmpty) break;
+          n++;
+          code = '${prefix}_$n';
+        }
+        final sort = await tx.execute(
+            Sql.named('SELECT COALESCE(MAX(sort_order),0)+1 AS n FROM event_crew_roles'));
+        final ins = await tx.execute(Sql.named('''
+          INSERT INTO event_crew_roles(code, label, sort_order)
+          VALUES(@c, @l, @s)
+          RETURNING id, code, label, note_hint, requires_note
+        '''), parameters: {
+          'c': code,
+          'l': label,
+          's': int.parse(
+              (sort.first.toColumnMap()['n'] as Object).toString()),
+        });
+        return ins.first.toColumnMap();
+      });
+      return json(roleJson(saved), status: 201);
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.delete('/events/crew-roles/<id>', (Request req, String id) async {
+    try {
+      final actor = await me(req);
+      if (actor['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat menghapus bagian event.');
+      }
+      await db.pool.runTx((tx) async {
+        final cur = await tx.execute(Sql.named(
+          'SELECT code, label FROM event_crew_roles WHERE id=@i::uuid',
+        ), parameters: {'i': id});
+        if (cur.isEmpty) throw const _Http(404, 'Bagian tidak ditemukan.');
+        final m = cur.first.toColumnMap();
+        final used = await tx.execute(Sql.named(
+          'SELECT COUNT(*) AS c FROM event_crew WHERE role=@r',
+        ), parameters: {'r': m['code']});
+        final n = int.parse((used.first.toColumnMap()['c'] as Object).toString());
+        if (n > 0) {
+          throw _Http(400,
+              'Bagian "${m['label']}" dipakai $n partisipan. Pindahkan mereka ke bagian lain dulu.');
+        }
+        final total = await tx.execute(
+            Sql.named('SELECT COUNT(*) AS c FROM event_crew_roles'));
+        if (int.parse((total.first.toColumnMap()['c'] as Object).toString()) <= 1) {
+          throw const _Http(400, 'Minimal satu bagian event harus tersisa.');
+        }
+        await tx.execute(
+          Sql.named('DELETE FROM event_crew_roles WHERE id=@i::uuid'),
+          parameters: {'i': id},
+        );
+      });
+      return json({'ok': true});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
   // ---------- event ----------
   Future<void> ensureToday(TxSession tx, String viewer, List<Map<String, dynamic>> evs) async {
     final today = dateOnly(nowWib());
@@ -582,24 +757,27 @@ Router eventRouter(Db db, Config cfg) {
     }
   });
 
-  const crewRoles = {'crew', 'pic', 'pm', 'sla', 'slb', 'slc', 'design'};
-
   r.post('/events/<id>/join', (Request req, String id) async {
     try {
       final u = await me(req);
       final b = await readJson(req);
       final role = ((b['role'] ?? '') as String);
       final note = ((b['note'] ?? '') as String).trim();
-      if (!crewRoles.contains(role)) throw const _Http(422, 'Bagian crew tidak dikenal.');
-      if (role == 'pic' && note.isEmpty) {
-        throw const _Http(422, 'Keterangan wajib untuk PIC, mis. PIC Venue atau PIC Talent.');
-      }
       if (note.length > 80) throw const _Http(422, 'Keterangan maksimal 80 karakter.');
       final e = await db.pool.runTx((tx) async {
         final cur = await tx.execute(
             Sql.named('SELECT * FROM events WHERE id=@i::uuid'), parameters: {'i': id});
         if (cur.isEmpty) {
           throw const _Http(404, 'Event tidak ditemukan. Mungkin sudah dihapus.');
+        }
+        final roleRs = await tx.execute(Sql.named(
+          'SELECT label, requires_note FROM event_crew_roles WHERE code=@c',
+        ), parameters: {'c': role});
+        if (roleRs.isEmpty) throw const _Http(422, 'Bagian crew tidak dikenal.');
+        final rm = roleRs.first.toColumnMap();
+        if ((rm['requires_note'] as bool) && note.isEmpty) {
+          throw _Http(422,
+              'Keterangan wajib untuk ${rm['label']}, mis. ${rm['label']} Venue.');
         }
         await tx.execute(Sql.named('''
           INSERT INTO event_crew(event_id, username, full_name, role, note)

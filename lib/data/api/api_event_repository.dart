@@ -50,12 +50,18 @@ class ApiEventRepository implements EventRepository {
 
   Map<String, dynamic> _map(Object? e) => Map<String, dynamic>.from(e as Map);
 
-  CrewRole _crewRole(Object? v) {
-    for (final r in CrewRole.values) {
-      if (r.name == v) return r;
-    }
-    return CrewRole.crew;
-  }
+  CrewRole _role(Map<String, dynamic> m) => CrewRole(
+        id: (m['id'] ?? '').toString(),
+        code: (m['code'] ?? '').toString(),
+        label: (m['label'] ?? '').toString(),
+        noteHint: (m['noteHint'] ?? '').toString(),
+        requiresNote: (m['requiresNote'] as bool?) ?? false,
+        used: (m['used'] as num?)?.toInt() ?? 0,
+      );
+
+  List<CrewRole> _roles(Object? raw) => [
+        for (final e in (raw as List? ?? [])) _role(_map(e)),
+      ];
 
   EventSize _size(Object? v) {
     for (final s in EventSize.values) {
@@ -64,17 +70,28 @@ class ApiEventRepository implements EventRepository {
     return EventSize.small;
   }
 
-  CrewMember _member(Map<String, dynamic> m) => CrewMember(
-        username: (m['username'] ?? '').toString(),
-        fullName: (m['fullName'] ?? '').toString(),
-        role: _crewRole(m['role']),
-        note: (m['note'] ?? '').toString(),
-        joinedAt: apiDateTime(m['joinedAt']),
-      );
+  CrewMember _member(Map<String, dynamic> m, Map<String, CrewRole> roles) {
+    final code = (m['role'] ?? '').toString();
+    return CrewMember(
+      username: (m['username'] ?? '').toString(),
+      fullName: (m['fullName'] ?? '').toString(),
+      role: roles[code] ??
+          CrewRole(
+            id: '',
+            code: code,
+            label: code,
+            noteHint: 'Tambahkan keterangan bila perlu',
+          ),
+      note: (m['note'] ?? '').toString(),
+      joinedAt: apiDateTime(m['joinedAt']),
+    );
+  }
 
   EventItem _item(Map<String, dynamic> m) {
     final cat = _map(m['category']);
     final ent = m['entity'] == null ? null : _map(m['entity']);
+    final roles = _roles(m['roles']);
+    final roleByCode = {for (final r in roles) r.code: r};
     return EventItem(
       id: (m['id'] ?? '').toString(),
       name: (m['name'] ?? '').toString(),
@@ -96,9 +113,11 @@ class ApiEventRepository implements EventRepository {
       size: _size(m['size']),
       createdBy: (m['createdBy'] ?? '').toString(),
       crew: [
-        for (final e in (m['crew'] as List? ?? [])) _member(_map(e)),
+        for (final e in (m['crew'] as List? ?? []))
+          _member(_map(e), roleByCode),
       ],
       poValue: (m['poValue'] as num?)?.toInt(),
+      crewRoles: roles.isEmpty ? CrewRole.defaults : roles,
     );
   }
 
@@ -262,6 +281,42 @@ class ApiEventRepository implements EventRepository {
   }
 
   @override
+  Future<List<CrewRole>> fetchCrewRoles(AuthUser actor) async {
+    final res = await _client.get(
+      Uri.parse('$_base/events/crew-roles'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    return List<CrewRole>.unmodifiable(_roles(m['roles']));
+  }
+
+  @override
+  Future<CrewRole> createCrewRole(
+    AuthUser actor, {
+    required String label,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/events/crew-roles'),
+      headers: await _h(),
+      body: jsonEncode({'label': label}),
+    );
+    if (res.statusCode != 201) _throw(res.body, res.statusCode);
+    _ping();
+    return _role(jsonDecode(res.body) as Map<String, dynamic>);
+  }
+
+  @override
+  Future<void> deleteCrewRole(AuthUser actor, {required String id}) async {
+    final res = await _client.delete(
+      Uri.parse('$_base/events/crew-roles/$id'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    _ping();
+  }
+
+  @override
   Future<List<EventItem>> fetchEvents(AuthUser viewer) async {
     final res = await _client.get(
       Uri.parse('$_base/events'),
@@ -390,7 +445,7 @@ class ApiEventRepository implements EventRepository {
     final res = await _client.post(
       Uri.parse('$_base/events/$id/join'),
       headers: await _h(),
-      body: jsonEncode({'role': role.name, 'note': note}),
+      body: jsonEncode({'role': role.code, 'note': note}),
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
     _ping();

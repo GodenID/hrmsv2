@@ -178,6 +178,7 @@ class _CrewFormPageState extends State<CrewFormPage> {
             ),
             const SizedBox(height: 2),
             CrewRolePicker(
+              roles: widget.event.crewRoles,
               selected: role,
               enabled: !_isSubmitting,
               onSelect: _selectRole,
