@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import 'app.dart';
+import 'core/app_info.dart';
 import 'core/app_scope.dart';
 import 'core/push_notifications.dart';
 import 'core/session_storage.dart';
@@ -24,6 +25,7 @@ Future<void> main() async {
     baseUrl: baseUrl,
     sessionStorage: SharedPrefsSessionStorage(),
   );
+  await AppInfo.load();
   runApp(PrasastiConnectApp(dependencies: dependencies));
   // Push: nonblokir & nonfatal. Tanpa file Firebase, diam-diam nonaktif.
   if (dependencies.notifications is ApiNotificationRepository) {

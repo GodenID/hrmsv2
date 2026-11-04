@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/app_info.dart';
 import '../../../core/app_scope.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../../core/theme/theme_colors.dart';
@@ -33,6 +34,44 @@ class _AccountMenuButtonState extends State<AccountMenuButton> {
   );
 
   void _toggle() => _menu.isOpen ? _menu.close() : _menu.open();
+
+  void _showAbout(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Tentang aplikasi'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppInfo.appName,
+              style: textTheme.bodyLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Versi ${AppInfo.versionLabel}',
+              style: textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              AppInfo.companyName,
+              style: textTheme.bodySmall,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Tutup'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -69,6 +108,12 @@ class _AccountMenuButtonState extends State<AccountMenuButton> {
           leadingIcon: const Icon(Icons.person_outline),
           onPressed: () => ShellController.maybeOf(context)?.openProfile(),
           child: const Text('Profil saya'),
+        ),
+        MenuItemButton(
+          style: _itemStyle(context.ink),
+          leadingIcon: const Icon(Icons.info_outline),
+          onPressed: () => _showAbout(context),
+          child: const Text('Tentang aplikasi'),
         ),
         MenuItemButton(
           style: _itemStyle(context.danger),

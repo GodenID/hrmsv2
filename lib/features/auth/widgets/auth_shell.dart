@@ -16,8 +16,6 @@ class AuthShell extends StatelessWidget {
 
   final Widget child;
 
-  static const String _footer = AppInfo.footer;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -101,7 +99,7 @@ class _SplitLayout extends StatelessWidget {
                             const SizedBox(height: AppSpacing.xl),
                             const LocalClock(),
                             const SizedBox(height: AppSpacing.xxxl),
-                            Text(AuthShell._footer, style: textTheme.bodySmall),
+                            Text(AppInfo.footer, style: textTheme.bodySmall),
                           ],
                         ),
                       ],
@@ -190,7 +188,7 @@ class _SingleColumnLayout extends StatelessWidget {
                       ],
                     ),
                     Text(
-                      AuthShell._footer,
+                      AppInfo.footer,
                       style: textTheme.bodySmall?.copyWith(fontSize: 12),
                       textAlign: TextAlign.center,
                     ),
