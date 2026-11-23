@@ -125,6 +125,7 @@ class _AnnouncementCarouselState extends State<AnnouncementCarousel> {
   Future<void> _create() async {
     final saved = await showAnnouncementEditor(
       context,
+      actor: widget.user,
       onSubmit: (draft) async {
         await widget.repository.create(actor: widget.user, draft: draft);
       },

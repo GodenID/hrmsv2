@@ -20,11 +20,13 @@ typedef AnnouncementSubmit = Future<void> Function(AnnouncementDraft draft);
 /// Mengembalikan true bila tersimpan.
 Future<bool> showAnnouncementEditor(
   BuildContext context, {
+  required AuthUser actor,
   Announcement? initial,
   required AnnouncementSubmit onSubmit,
 }) async {
   final isNarrow = MediaQuery.sizeOf(context).width < 600;
   final editor = _AnnouncementEditor(
+    actor: actor,
     initial: initial,
     onSubmit: onSubmit,
     fullscreen: isNarrow,
@@ -49,11 +51,14 @@ Future<bool> showAnnouncementEditor(
 
 class _AnnouncementEditor extends StatefulWidget {
   const _AnnouncementEditor({
+    required this.actor,
     required this.initial,
     required this.onSubmit,
     required this.fullscreen,
   });
 
+  /// Dialog berada di root navigator, di luar SessionScope milik shell.
+  final AuthUser actor;
   final Announcement? initial;
   final AnnouncementSubmit onSubmit;
   final bool fullscreen;
@@ -125,7 +130,7 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
   void didChangeDependencies() {
     super.didChangeDependencies();
     _divisionsFuture ??= AppScope.of(context).master.fetchDivisions(
-          SessionScope.userOf(context),
+          widget.actor,
         );
   }
 
@@ -492,7 +497,7 @@ class _AnnouncementEditorState extends State<_AnnouncementEditor> {
                                 _divisionsFuture = AppScope.of(context)
                                     .master
                                     .fetchDivisions(
-                                      SessionScope.userOf(context),
+                                      widget.actor,
                                     );
                               }),
                       child: const Text('Coba lagi'),

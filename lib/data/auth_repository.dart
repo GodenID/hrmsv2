@@ -65,8 +65,9 @@ enum UserRole {
 
   final String label;
 
-  /// Hak kelola pengumuman (tambah/ubah/hapus) — hanya Super Admin.
-  bool get canManageAnnouncements => this == UserRole.superadmin;
+  /// Hak kelola pengumuman (tambah/ubah/hapus) — Manager & Super Admin.
+  bool get canManageAnnouncements =>
+      this == UserRole.manager || this == UserRole.superadmin;
 
   /// Hak melihat siapa saja yang sudah/belum membaca pengumuman — semua
   /// role.

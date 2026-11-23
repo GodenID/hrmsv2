@@ -129,6 +129,7 @@ class _AnnouncementDetailPageState extends State<AnnouncementDetailPage> {
   Future<void> _edit() async {
     final saved = await showAnnouncementEditor(
       context,
+      actor: widget.user,
       initial: _announcement,
       onSubmit: (draft) async {
         final updated = await widget.repository.update(

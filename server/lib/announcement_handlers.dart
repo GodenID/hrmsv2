@@ -107,9 +107,10 @@ Router announcementRouter(Db db, Config cfg) {
     return targets.contains(division);
   }
 
-  void requireSuperadmin(Map<String, dynamic> actor) {
-    if (actor['role'] != 'superadmin') {
-      throw const _Http(403, 'Hanya Super Admin yang dapat mengelola pengumuman.');
+  void requireAnnouncementManager(Map<String, dynamic> actor) {
+    final role = actor['role'];
+    if (role != 'superadmin' && role != 'manager') {
+      throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat mengelola pengumuman.');
     }
   }
 
@@ -342,7 +343,7 @@ Router announcementRouter(Db db, Config cfg) {
   r.post('/announcements', (Request req) async {
     try {
       final actor = await me(req);
-      requireSuperadmin(actor);
+      requireAnnouncementManager(actor);
       final body = await readJson(req);
       final out =
           await db.pool.runTx((tx) => save(tx, actor, body, null));
@@ -377,7 +378,7 @@ Router announcementRouter(Db db, Config cfg) {
   r.put('/announcements/<id>', (Request req, String id) async {
     try {
       final actor = await me(req);
-      requireSuperadmin(actor);
+      requireAnnouncementManager(actor);
       final body = await readJson(req);
       final out = await db.pool.runTx((tx) => save(tx, actor, body, id));
       return json(out);
@@ -389,7 +390,7 @@ Router announcementRouter(Db db, Config cfg) {
   r.delete('/announcements/<id>', (Request req, String id) async {
     try {
       final actor = await me(req);
-      requireSuperadmin(actor);
+      requireAnnouncementManager(actor);
       final keys = await db.pool.runTx((tx) async {
         final atts = await attsFor(tx, id);
         final n = await tx.execute(Sql.named('DELETE FROM announcements WHERE id=@i::uuid'),
