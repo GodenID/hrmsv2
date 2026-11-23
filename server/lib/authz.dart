@@ -6,7 +6,7 @@ import 'db.dart';
 import 'tokens.dart';
 
 /// Pengguna terautentikasi dari Bearer token + baris users.
-/// null = tanpa token / sesi dicabut / kedaluwarsa / nonaktif.
+/// null = tanpa token / sesi dicabut / akun nonaktif.
 Future<Map<String, dynamic>?> authedUser(
   Request req,
   Db db,
@@ -24,9 +24,6 @@ Future<Map<String, dynamic>?> authedUser(
     if (s.isEmpty) return null;
     final m = s.first.toColumnMap();
     if (m['revoked_at'] != null) return null;
-    if (DateTime.now().toUtc().isAfter((m['expires_at'] as DateTime).toUtc())) {
-      return null;
-    }
     final u = await tx.execute(
       Sql.named('SELECT * FROM users WHERE id=@i::uuid'),
       parameters: {'i': jwt.subject},

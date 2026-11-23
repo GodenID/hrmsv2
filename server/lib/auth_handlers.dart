@@ -300,7 +300,6 @@ Router authRouter(Db db, Config cfg) {
       if (s.isEmpty) return null;
       final m = s.first.toColumnMap();
       if (m['revoked_at'] != null) return null;
-      if (DateTime.now().toUtc().isAfter((m['expires_at'] as DateTime).toUtc())) return null;
       final u = await tx.execute(Sql.named('SELECT * FROM users WHERE id=@i::uuid'),
           parameters: {'i': sub});
       if (u.isEmpty) return null;
