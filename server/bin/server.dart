@@ -8,7 +8,8 @@ import 'package:prasasti_server/announcement_handlers.dart';
 import 'package:prasasti_server/app_handlers.dart';
 import 'package:prasasti_server/attendance_handlers.dart';
 import 'package:prasasti_server/auth_handlers.dart';
-import 'package:prasasti_server/event_handlers.dart';
+import 'package:prasasti_server/event_handlers.dart'
+    show ensureEventCrewDates, ensureEventCrewRoles, eventRouter;
 import 'package:prasasti_server/leave_handlers.dart';
 import 'package:prasasti_server/master_handlers.dart';
 import 'package:prasasti_server/notify.dart' show PushBus;
@@ -58,6 +59,7 @@ Future<void> main() async {
   PushBus.configure(database: db, sender: FcmSender(cfg));
   if (cfg.runMigrations) await runMigrations(db);
   await ensureEventCrewRoles(db);
+  await ensureEventCrewDates(db);
 
   final auth = authRouter(db, cfg);
   final emp = employeeRouter(db, cfg);

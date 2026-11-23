@@ -90,6 +90,27 @@ Future<void> ensureEventCrewRoles(Db db) async {
   });
 }
 
+/// Pastikan tabel hari kehadiran partisipan ada walau migrasi otomatis
+/// tidak dijalankan. Idempoten: aman dipanggil setiap server mulai.
+Future<void> ensureEventCrewDates(Db db) async {
+  await db.pool.runTx((tx) async {
+    await tx.execute(Sql.named('''
+      CREATE TABLE IF NOT EXISTS event_crew_dates (
+        event_id UUID NOT NULL,
+        username TEXT NOT NULL,
+        date DATE NOT NULL,
+        PRIMARY KEY (event_id, username, date),
+        FOREIGN KEY (event_id, username)
+          REFERENCES event_crew(event_id, username) ON DELETE CASCADE
+      )
+    '''));
+    await tx.execute(Sql.named('''
+      CREATE INDEX IF NOT EXISTS event_crew_dates_event_idx
+        ON event_crew_dates(event_id)
+    '''));
+  });
+}
+
 Router eventRouter(Db db, Config cfg) {
   final r = Router();
 
