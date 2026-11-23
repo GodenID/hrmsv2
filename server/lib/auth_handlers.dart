@@ -14,7 +14,9 @@ import 'tokens.dart';
 import 'validate.dart';
 
 const _maxAttempts = 5;
-const _sessionTtl = Duration(days: 30);
+
+/// Sesi berlaku sampai logout manual / pencabutan admin, bukan waktu.
+final _sessionExpiresAt = DateTime.utc(9999, 12, 31, 23, 59, 59);
 
 Response json(Object body, {int status = 200}) => Response(
       status,
@@ -178,7 +180,7 @@ Router authRouter(Db db, Config cfg) {
         final jti = newJti();
         await tx.execute(Sql.named(
           'INSERT INTO sessions(jti, user_id, expires_at) VALUES(@j::uuid, @u::uuid, @e)',
-        ), parameters: {'j': jti, 'u': (row['id'] as Object).toString(), 'e': now.add(_sessionTtl).toIso8601String()});
+        ), parameters: {'j': jti, 'u': (row['id'] as Object).toString(), 'e': _sessionExpiresAt.toIso8601String()});
         final token = issueJwt(secret: cfg.jwtSecret, userId: (row['id'] as Object).toString(),
             username: row['username'] as String, role: row['role'] as String, jti: jti);
         // kabari pengelola (kecuali pendaftar pertama yg belum ada siapa2)
@@ -270,10 +272,9 @@ Router authRouter(Db db, Config cfg) {
         await tx.execute(Sql.named('DELETE FROM login_attempts WHERE username=@u'),
             parameters: {'u': name});
         final jti = newJti();
-        final now = DateTime.now().toUtc();
         await tx.execute(Sql.named(
           'INSERT INTO sessions(jti, user_id, expires_at) VALUES(@j::uuid, @u::uuid, @e)',
-        ), parameters: {'j': jti, 'u': (m['id'] as Object).toString(), 'e': now.add(_sessionTtl).toIso8601String()});
+        ), parameters: {'j': jti, 'u': (m['id'] as Object).toString(), 'e': _sessionExpiresAt.toIso8601String()});
         final token = issueJwt(secret: cfg.jwtSecret, userId: (m['id'] as Object).toString(),
             username: m['username'] as String, role: m['role'] as String, jti: jti);
         return {'token': token, 'user': userJson(m.map((k, v) => MapEntry(k.toString(), v)))};

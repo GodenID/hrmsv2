@@ -20,12 +20,16 @@ String issueJwt({
     subject: userId,
     jwtId: jti,
   );
-  return jwt.sign(SecretKey(secret), expiresIn: const Duration(days: 30));
+  // Tanpa klaim exp: sesi tidak kedaluwarsa sendiri. Masa berlaku dipegang
+  // baris `sessions` di DB, yang dicabut hanya saat logout/reset/admin.
+  return jwt.sign(SecretKey(secret));
 }
 
 JWT? verifyJwt(String token, String secret) {
   try {
-    return JWT.verify(token, SecretKey(secret));
+    // Token lama masih punya exp 30 hari. Lewati pengecekan exp agar sesi
+    // yang sudah berjalan tidak terputus setelah perbaikan ini.
+    return JWT.verify(token, SecretKey(secret), checkExpiresIn: false);
   } catch (_) {
     return null;
   }
