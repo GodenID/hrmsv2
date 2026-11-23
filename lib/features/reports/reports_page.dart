@@ -1,8 +1,4 @@
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
 
 import '../../core/app_scope.dart';
 import '../../core/theme/app_spacing.dart';
@@ -16,6 +12,7 @@ import '../../data/attendance_repository.dart';
 import '../../data/employee_repository.dart';
 import '../../data/event_repository.dart';
 import '../../data/leave_repository.dart';
+import 'report_export.dart';
 import 'report_workbook.dart';
 
 /// Laporan & ekspor Super Admin: rekap otomatis + pratinjau + berkas
@@ -332,12 +329,7 @@ class _ReportsPageState extends State<ReportsPage> {
     try {
       final bytes = buildWorkbookBytes(_buildSheets());
       if (bytes == null) throw const AppException('Berkas gagal dibuat.');
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/$_fileName');
-      await file.writeAsBytes(bytes);
-      await SharePlus.instance.share(
-        ShareParams(files: [XFile(file.path)], subject: 'Laporan HRMS'),
-      );
+      await shareReportFile(bytes, _fileName);
     } on AppException catch (e) {
       if (mounted) showAppSnackBar(context, e.message);
     } catch (_) {

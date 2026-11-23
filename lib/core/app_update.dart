@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -112,7 +113,7 @@ class AppUpdater {
 
   /// Fitur ini hanya untuk Android. iOS/web/desktop tidak punya pemasangan
   /// APK mandiri; pembaruan lewat store masing-masing.
-  bool get supported => Platform.isAndroid;
+  bool get supported => !kIsWeb && Platform.isAndroid;
 
   Future<int> currentVersionCode() async {
     final override = _currentVersionCode;
