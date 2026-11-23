@@ -56,6 +56,9 @@ abstract class AttendanceRepository {
     AuthUser user, {
     required int year,
     required int month,
+
+    /// Username karyawan lain untuk laporan Super Admin. Null = sesi sendiri.
+    String? username,
   });
 
   /// Bulan paling awal yang punya data (bulan mulai bekerja).

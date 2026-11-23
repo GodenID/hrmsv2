@@ -32,11 +32,19 @@ String isoUtc(DateTime d) => d.toUtc().toIso8601String();
 
 String? isoUtcOpt(DateTime? d) => d?.toUtc().toIso8601String();
 
-/// Terlambat = clock in lewat 09.00 WIB. Selalu konversi ke WIB dulu:
+/// Batas masuk tiap divisi (WIB). Produksi Mutiari 08.00, divisi lain 09.00.
+const int latestOnTimeHourDefault = 9;
+const int latestOnTimeHourProduksiMutiari = 8;
+
+/// Terlambat = clock in lewat batas masuk divisi. Selalu konversi ke WIB dulu:
 /// container server berjalan di UTC sehingga .hour langsung / .toLocal()
 /// SALAH (tidak ada yang pernah terlambat).
-bool isLate(DateTime clockIn) {
+bool isLate(DateTime clockIn, {String division = ''}) {
   final wib = clockIn.toUtc().add(const Duration(hours: 7));
-  return wib.hour > 9 ||
-      (wib.hour == 9 && (wib.minute > 0 || wib.second > 0));
+  final key = division.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
+  final latest = key == 'produksimutiari'
+      ? latestOnTimeHourProduksiMutiari
+      : latestOnTimeHourDefault;
+  return wib.hour > latest ||
+      (wib.hour == latest && (wib.minute > 0 || wib.second > 0));
 }

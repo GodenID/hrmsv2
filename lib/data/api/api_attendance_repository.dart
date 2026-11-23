@@ -263,9 +263,12 @@ class ApiAttendanceRepository implements AttendanceRepository {
 
   @override
   Future<List<AttendanceDay>> fetchMonth(AuthUser user,
-      {required int year, required int month}) async {
+      {required int year, required int month, String? username}) async {
+    final target = username == null || username.isEmpty
+        ? ''
+        : '&username=${Uri.encodeComponent(username)}';
     final res = await _client.get(
-      Uri.parse('$_base/attendance/month?year=$year&month=$month'),
+      Uri.parse('$_base/attendance/month?year=$year&month=$month$target'),
       headers: await _h(),
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);

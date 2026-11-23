@@ -315,8 +315,10 @@ class _AttendanceHistoryPageState extends State<AttendanceHistoryPage> {
             'hari libur. Tanggal mendatang tidak bisa diketuk. Jam masuk '
             'paling lambat '
             '${WorkPolicy.latestOnTimeHour.toString().padLeft(2, '0')}.'
-            '${WorkPolicy.latestOnTimeMinute.toString().padLeft(2, '0')}. '
-            'Pengajuan yang masih menunggu ditandai berarsir.',
+            '${WorkPolicy.latestOnTimeMinute.toString().padLeft(2, '0')} '
+            '(${WorkPolicy.produksiMutiariLatestOnTimeHour.toString().padLeft(2, '0')}.'
+            '${WorkPolicy.latestOnTimeMinute.toString().padLeft(2, '0')} untuk '
+            'Produksi Mutiari). Pengajuan yang masih menunggu ditandai berarsir.',
             style: textTheme.bodySmall?.copyWith(fontSize: 12.5, height: 1.5),
           ),
         ],

@@ -2,8 +2,10 @@
 /// Pengaturan Perusahaan / server).
 abstract final class WorkPolicy {
   /// Jam kerja mulai 09.00; datang setelahnya dihitung terlambat.
+  /// Produksi Mutiari mulai 08.00. Server yang menentukan status akhir.
   static const int latestOnTimeHour = 9;
   static const int latestOnTimeMinute = 0;
+  static const int produksiMutiariLatestOnTimeHour = 8;
 
   /// Koreksi absensi hanya untuk N hari ke belakang.
   static const int correctionWindowDays = 30;

@@ -103,6 +103,7 @@ class _ReportsPageState extends State<ReportsPage> {
                     user,
                     year: m.year,
                     month: m.month,
+                    username: e.username,
                   ),
               ]);
               bool inRange(AttendanceDay d) =>

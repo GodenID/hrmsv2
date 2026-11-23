@@ -416,6 +416,25 @@ Router attendanceRouter(Db db, Config cfg) {
   r.get('/attendance/month', (Request req) async {
     try {
       final u = await me(req);
+      // Laporan Super Admin mengambil absensi per karyawan. Tanpa username,
+      // endpoint tetap memakai sesi yang login (riwayat absensi / dashboard).
+      final requested = req.url.queryParameters['username']?.trim().toLowerCase();
+      var target = u;
+      if (requested != null &&
+          requested.isNotEmpty &&
+          requested != (u['username'] as String).toLowerCase()) {
+        if (u['role'] != 'superadmin') {
+          throw const _Http(403, 'Hanya Super Admin yang dapat melihat absensi karyawan lain.');
+        }
+        final rows = await db.pool.runTx((tx) => tx.execute(Sql.named(
+              'SELECT * FROM users WHERE LOWER(username)=@u',
+            ), parameters: {'u': requested}));
+        if (rows.isEmpty) throw const _Http(404, 'Karyawan tidak ditemukan.');
+        target = rows.first.toColumnMap().map(
+              (k, v) => MapEntry(k.toString(), v),
+            );
+      }
+      final uid = (target['id'] as Object).toString();
       final year = int.tryParse(req.url.queryParameters['year'] ?? '');
       final month = int.tryParse(req.url.queryParameters['month'] ?? '');
       if (year == null || month == null || month < 1 || month > 12) {
@@ -425,7 +444,7 @@ Router attendanceRouter(Db db, Config cfg) {
       final today = dateOnly(nowWib);
       final joinRows = await db.pool.runTx((tx) => tx.execute(Sql.named(
             'SELECT join_date FROM users WHERE id=@i::uuid',
-          ), parameters: {'i': (u['id'] as Object).toString()}));
+          ), parameters: {'i': uid}));
       final join = dateOnly((joinRows.first.toColumnMap()['join_date'] as DateTime));
       final lastDay = DateTime(year, month + 1, 0).day;
       // cuti menunggu/disetujui yg menyentuh bulan ini (untuk overlay)
@@ -436,7 +455,7 @@ Router attendanceRouter(Db db, Config cfg) {
           AND status IN ('pending','approved')
           AND start_date<=@e AND end_date>=@s
       '''), parameters: {
-        'i': (u['id'] as Object).toString(),
+        'i': uid,
         's': monthStart,
         'e': monthEnd,
       }));
@@ -487,7 +506,7 @@ Router attendanceRouter(Db db, Config cfg) {
         SELECT * FROM attendance_corrections WHERE user_id=@i::uuid
           AND date>=@s AND date<=@e ORDER BY submitted_at DESC
       '''), parameters: {
-        'i': (u['id'] as Object).toString(),
+        'i': uid,
         's': monthStart,
         'e': monthEnd,
       })));
@@ -496,7 +515,7 @@ Router attendanceRouter(Db db, Config cfg) {
           AND status IN ('pending','approved')
           AND date>=@s AND date<=@e ORDER BY submitted_at DESC
       '''), parameters: {
-        'i': (u['id'] as Object).toString(),
+        'i': uid,
         's': monthStart,
         'e': monthEnd,
       })));
@@ -504,7 +523,7 @@ Router attendanceRouter(Db db, Config cfg) {
         SELECT * FROM out_of_area_requests WHERE user_id=@i::uuid
           AND date>=@s AND date<=@e ORDER BY submitted_at DESC
       '''), parameters: {
-        'i': (u['id'] as Object).toString(),
+        'i': uid,
         's': monthStart,
         'e': monthEnd,
       })));
@@ -545,12 +564,12 @@ Router attendanceRouter(Db db, Config cfg) {
         final ooaLatest = latestOn(ooaRows, date);
         final rows = await db.pool.runTx((tx) => tx.execute(Sql.named(
               'SELECT * FROM attendance_records WHERE user_id=@i::uuid AND date=@d',
-            ), parameters: {'i': (u['id'] as Object).toString(), 'd': date.toIso8601String().substring(0, 10)}));
+            ), parameters: {'i': uid, 'd': date.toIso8601String().substring(0, 10)}));
         // koreksi disetujui menimpa
         final corr = await db.pool.runTx((tx) => tx.execute(Sql.named(
               '''SELECT * FROM attendance_corrections WHERE user_id=@i::uuid AND date=@d
                  AND status='approved' ORDER BY submitted_at DESC LIMIT 1''',
-            ), parameters: {'i': (u['id'] as Object).toString(), 'd': date.toIso8601String().substring(0, 10)}));
+            ), parameters: {'i': uid, 'd': date.toIso8601String().substring(0, 10)}));
         DateTime? ci, co;
         String? cil, col;
         if (rows.isNotEmpty) {
@@ -564,7 +583,7 @@ Router attendanceRouter(Db db, Config cfg) {
         final ooa = await db.pool.runTx((tx) => tx.execute(Sql.named(
               '''SELECT * FROM out_of_area_requests WHERE user_id=@i::uuid AND date=@d
                  AND status='approved' ORDER BY submitted_at DESC''',
-            ), parameters: {'i': (u['id'] as Object).toString(), 'd': date.toIso8601String().substring(0, 10)}));
+            ), parameters: {'i': uid, 'd': date.toIso8601String().substring(0, 10)}));
         for (final row in ooa) {
           final m = row.toColumnMap();
           if (m['kind'] == 'clockIn') {
@@ -589,10 +608,12 @@ Router attendanceRouter(Db db, Config cfg) {
           status = 'notYet';
         } else if (ci == null) {
           status = 'absent';
+        } else if (isLate(ci, division: (target['division'] ?? '').toString())) {
+          status = 'late';
         } else if (co == null) {
           status = isToday ? 'inProgress' : 'incomplete';
         } else {
-          status = isLate(ci) ? 'late' : 'onTime';
+          status = 'onTime';
         }
         out.add({
           'date': date.toIso8601String().substring(0, 10),
