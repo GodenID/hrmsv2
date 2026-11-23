@@ -84,6 +84,10 @@ class ApiEventRepository implements EventRepository {
           ),
       note: (m['note'] ?? '').toString(),
       joinedAt: apiDateTime(m['joinedAt']),
+      dates: [
+        for (final d in (m['dates'] as List? ?? const []))
+          apiDateTime(d.toString()),
+      ],
     );
   }
 
@@ -441,11 +445,18 @@ class ApiEventRepository implements EventRepository {
     required String id,
     required CrewRole role,
     required String note,
+    List<DateTime> dates = const [],
   }) async {
     final res = await _client.post(
       Uri.parse('$_base/events/$id/join'),
       headers: await _h(),
-      body: jsonEncode({'role': role.code, 'note': note}),
+      body: jsonEncode({
+        'role': role.code,
+        'note': note,
+        'dates': [
+          for (final d in dates) d.toIso8601String().substring(0, 10),
+        ],
+      }),
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
     _ping();

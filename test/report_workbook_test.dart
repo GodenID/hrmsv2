@@ -448,6 +448,50 @@ void main() {
     });
   });
 
+  group('eventCrewSheet', () {
+    test('hari ikut per partisipan: pilihan vs semua hari', () {
+      final s = DateTime(2026, 10, 26);
+      final e = DateTime(2026, 10, 28);
+      final sheet = eventCrewSheet([
+        EventItem(
+          id: 'EV-1',
+          name: 'Event 3 hari',
+          company: 'PT Tes',
+          category: const EventCategory(id: 'EC-1', name: 'Workshop'),
+          startDate: s,
+          endDate: e,
+          location: 'Hall',
+          size: EventSize.small,
+          createdBy: 'Siti',
+          crew: [
+            CrewMember(
+              username: 'bagas',
+              fullName: 'Bagas',
+              role: CrewRole.crew,
+              note: '',
+              joinedAt: s,
+              dates: [s, e],
+            ),
+            CrewMember(
+              username: 'sari',
+              fullName: 'Sari',
+              role: CrewRole.crew,
+              note: '',
+              joinedAt: s,
+            ),
+          ],
+        ),
+      ]);
+      expect(sheet.header, contains('Hari ikut'));
+      expect(sheet.header, contains('Tanggal ikut'));
+      expect(sheet.rows[0][5], 2);
+      expect(sheet.rows[0][6], '26 Okt 2026, 28 Okt 2026');
+      expect(sheet.rows[1][5], 3);
+      expect(sheet.rows[1][6],
+          '26 Okt 2026, 27 Okt 2026, 28 Okt 2026');
+    });
+  });
+
   group('buildWorkbookBytes', () {
     test('menghasilkan berkas zip xlsx yang diawali PK', () {
       final bytes = buildWorkbookBytes([

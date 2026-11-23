@@ -29,6 +29,9 @@ class _CrewFormPageState extends State<CrewFormPage> {
 
   CrewMember? _existing;
   CrewRole? _role;
+  late List<DateTime> _days;
+  late Set<DateTime> _selectedDays;
+  String? _dateError;
   String? _roleError;
   String? _error;
   bool _submitted = false;
@@ -42,6 +45,13 @@ class _CrewFormPageState extends State<CrewFormPage> {
     _existing = widget.event.memberFor(SessionScope.userOf(context).username);
     _role = _existing?.role;
     _noteController.text = _existing?.note ?? '';
+    _days = eventDays(widget.event);
+    _selectedDays = {
+      if (_existing != null && _existing!.dates.isNotEmpty)
+        ..._existing!.dates
+      else
+        ..._days,
+    };
   }
 
   @override
@@ -65,9 +75,12 @@ class _CrewFormPageState extends State<CrewFormPage> {
       _submitted = true;
       _error = null;
       _roleError = _role == null ? 'Pilih bagian Anda di event ini' : null;
+      _dateError = _selectedDays.isEmpty
+          ? 'Pilih minimal satu hari kehadiran'
+          : null;
     });
     final formOk = _formKey.currentState?.validate() ?? false;
-    if (_role == null || !formOk) return;
+    if (_role == null || !formOk || _selectedDays.isEmpty) return;
 
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
@@ -77,6 +90,7 @@ class _CrewFormPageState extends State<CrewFormPage> {
         id: widget.event.id,
         role: _role!,
         note: _noteController.text,
+        dates: _selectedDays.toList()..sort(),
       );
       if (mounted) Navigator.of(context).pop(true);
     } on AppException catch (e) {
@@ -192,6 +206,47 @@ class _CrewFormPageState extends State<CrewFormPage> {
                   fontSize: 12.5,
                 ),
               ),
+            ],
+            if (e.isMultiDay) ...[
+              const SizedBox(height: AppSpacing.lg),
+              LabeledField(
+                label: 'Hari yang diikuti (${_selectedDays.length} dari ${_days.length})',
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  children: [
+                    for (final d in _days)
+                      FilterChip(
+                        label: Text(DateFormatId.shortDate(d)),
+                        selected: _selectedDays.contains(d),
+                        onSelected: _isSubmitting
+                            ? null
+                            : (checked) {
+                          setState(() {
+                            if (checked) {
+                              _selectedDays.add(d);
+                            } else {
+                              _selectedDays.remove(d);
+                            }
+                            _dateError = _selectedDays.isEmpty
+                                ? 'Pilih minimal satu hari kehadiran'
+                                : null;
+                          });
+                        },
+                      ),
+                  ],
+                ),
+              ),
+              if (_dateError != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  _dateError!,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: context.danger,
+                    fontSize: 12.5,
+                  ),
+                ),
+              ],
             ],
             const SizedBox(height: AppSpacing.lg + 4),
             LabeledField(

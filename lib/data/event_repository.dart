@@ -112,6 +112,9 @@ abstract class EventRepository {
     required String id,
     required CrewRole role,
     required String note,
+
+    /// Hari yang diikuti. Kosong = semua hari event.
+    List<DateTime> dates = const [],
   });
 
   Future<EventItem> leaveEvent(AuthUser user, {required String id});
@@ -258,6 +261,7 @@ class CrewMember {
     required this.role,
     required this.note,
     required this.joinedAt,
+    this.dates = const [],
   });
 
   final String username;
@@ -265,6 +269,9 @@ class CrewMember {
   final CrewRole role;
   final String note;
   final DateTime joinedAt;
+
+  /// Hari yang diikuti. Kosong = semua hari event (data lama).
+  final List<DateTime> dates;
 }
 
 /// Kategori event (Employee Gathering, Family Gathering, dsb.) yang

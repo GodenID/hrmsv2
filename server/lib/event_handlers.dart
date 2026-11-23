@@ -148,6 +148,17 @@ Router eventRouter(Db db, Config cfg) {
       SELECT username, full_name, role, note, joined_at FROM event_crew
       WHERE event_id=@i::uuid ORDER BY role, full_name
     '''), parameters: {'i': (e['id'] as Object).toString()});
+    final dateRs = await tx.execute(Sql.named('''
+      SELECT username, date FROM event_crew_dates
+      WHERE event_id=@i::uuid ORDER BY username, date
+    '''), parameters: {'i': (e['id'] as Object).toString()});
+    final datesByUser = <String, List<String>>{};
+    for (final row in dateRs) {
+      final m = row.toColumnMap();
+      datesByUser
+          .putIfAbsent((m['username'] as Object).toString(), () => [])
+          .add((m['date'] as DateTime).toIso8601String().substring(0, 10));
+    }
     final roleRs = await tx.execute(Sql.named('''
       SELECT id, code, label, note_hint, requires_note
       FROM event_crew_roles ORDER BY sort_order, label
@@ -203,6 +214,8 @@ Router eventRouter(Db db, Config cfg) {
             'role': row.toColumnMap()['role'],
             'note': row.toColumnMap()['note'],
             'joinedAt': isoUtc(row.toColumnMap()['joined_at'] as DateTime),
+            'dates': datesByUser[(row.toColumnMap()['username'] as Object).toString()] ??
+                const <String>[],
           }
       ],
     };
@@ -598,6 +611,24 @@ Router eventRouter(Db db, Config cfg) {
         WHERE event_id=@i::uuid AND username=@u
       '''), parameters: {'i': (e['id'] as Object).toString(), 'u': viewer});
       if (crew.isEmpty) continue;
+      final attends = await tx.execute(Sql.named('''
+        SELECT (
+          NOT EXISTS (
+            SELECT 1 FROM event_crew_dates
+            WHERE event_id=@i::uuid AND username=@u
+          ) OR EXISTS (
+            SELECT 1 FROM event_crew_dates
+            WHERE event_id=@i::uuid AND username=@u AND date=@d
+          )
+        ) AS ok
+      '''), parameters: {
+        'i': (e['id'] as Object).toString(),
+        'u': viewer,
+        'd': today.toIso8601String().substring(0, 10),
+      });
+      if (attends.isEmpty || attends.first.toColumnMap()['ok'] != true) {
+        continue;
+      }
       final m = crew.first.toColumnMap();
       await tx.execute(Sql.named('''
         INSERT INTO notifications(id, username, kind, title, body)
@@ -786,6 +817,20 @@ Router eventRouter(Db db, Config cfg) {
           throw _Http(422,
               'Keterangan wajib untuk ${rm['label']}, mis. ${rm['label']} Venue.');
         }
+        final rawDates = (b['dates'] as List?) ?? const <Object>[];
+        final picked = <DateTime>{};
+        for (final value in rawDates) {
+          final parsed = DateTime.tryParse(value.toString());
+          if (parsed == null) throw const _Http(422, 'Tanggal kehadiran tidak valid.');
+          picked.add(dateOnly(parsed));
+        }
+        final firstDay = dateOnly(cur.first.toColumnMap()['start_date'] as DateTime);
+        final lastDay = dateOnly(cur.first.toColumnMap()['end_date'] as DateTime);
+        if (picked.isNotEmpty &&
+            picked.any((d) => d.isBefore(firstDay) || d.isAfter(lastDay))) {
+          throw const _Http(422, 'Tanggal kehadiran harus berada dalam rentang event.');
+        }
+        final chosenDates = picked.toList()..sort();
         await tx.execute(Sql.named('''
           INSERT INTO event_crew(event_id, username, full_name, role, note)
           VALUES(@i::uuid,@u,@fn,@r,@n)
@@ -798,6 +843,19 @@ Router eventRouter(Db db, Config cfg) {
           'r': role,
           'n': note,
         });
+        await tx.execute(Sql.named('''
+          DELETE FROM event_crew_dates WHERE event_id=@i::uuid AND username=@u
+        '''), parameters: {'i': id, 'u': u['username']});
+        for (final d in chosenDates) {
+          await tx.execute(Sql.named('''
+            INSERT INTO event_crew_dates(event_id, username, date)
+            VALUES(@i::uuid, @u, @d)
+          '''), parameters: {
+            'i': id,
+            'u': u['username'],
+            'd': d.toIso8601String().substring(0, 10),
+          });
+        }
         return cur.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
       });
       final thr = await db.pool.runTx(thresholds);

@@ -7,6 +7,7 @@ import '../../data/attendance_repository.dart';
 import '../../data/employee_repository.dart';
 import '../../data/event_repository.dart';
 import '../../data/leave_repository.dart';
+import '../events/event_presentation.dart' show crewAttendanceDays;
 
 /// Jenis laporan yang bisa dipilih & diekspor.
 enum ReportKind {
@@ -359,18 +360,29 @@ ReportSheetData eventCrewSheet(
   final rows = <List<Object?>>[];
   for (final e in sorted) {
     for (final m in e.crew) {
+      final days = crewAttendanceDays(e, m);
       rows.add([
         e.name,
         DateFormatId.dateRange(e.startDate, e.endDate),
         m.fullName,
         m.role.label,
         m.note.isEmpty ? '—' : m.note,
+        days.length,
+        days.map((d) => DateFormatId.shortDate(d)).join(', '),
       ]);
     }
   }
   return ReportSheetData(
     title: 'Crew Event',
-    header: const ['Event', 'Tanggal', 'Nama', 'Bagian', 'Keterangan'],
+    header: const [
+      'Event',
+      'Tanggal',
+      'Nama',
+      'Bagian',
+      'Keterangan',
+      'Hari ikut',
+      'Tanggal ikut',
+    ],
     rows: rows,
   );
 }

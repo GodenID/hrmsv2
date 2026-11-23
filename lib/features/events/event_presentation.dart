@@ -2,8 +2,33 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_colors.dart';
+import '../../core/utils/date_format_id.dart';
+import '../../core/utils/work_calendar.dart';
 import '../../core/widgets/panel.dart';
 import '../../data/event_repository.dart';
+
+/// Semua hari dalam rentang event, termasuk akhir pekan.
+List<DateTime> eventDays(EventItem e) {
+  final days = <DateTime>[];
+  var d = WorkCalendar.dateOnly(e.startDate);
+  final last = WorkCalendar.dateOnly(e.endDate);
+  while (!d.isAfter(last)) {
+    days.add(d);
+    d = DateTime(d.year, d.month, d.day + 1);
+  }
+  return days;
+}
+
+/// Hari yang benar-benar diikuti partisipan. Kosong berarti semua hari.
+List<DateTime> crewAttendanceDays(EventItem e, CrewMember m) =>
+    m.dates.isEmpty ? eventDays(e) : m.dates;
+
+/// Mis. "3 hari · 26, 27, 28 Okt 2026".
+String crewAttendanceLabel(EventItem e, CrewMember m) {
+  final days = crewAttendanceDays(e, m);
+  final labels = days.map((d) => DateFormatId.shortDate(d)).join(', ');
+  return days.length == 1 ? '1 hari · $labels' : '${days.length} hari · $labels';
+}
 
 /// Chip kategori event. Bobot visual naik sesuai ukuran event.
 class EventSizeChip extends StatelessWidget {

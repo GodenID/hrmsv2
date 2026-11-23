@@ -435,6 +435,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
               )
             else
               _CrewList(
+                event: e,
                 crew: e.crew,
                 roles: e.crewRoles,
                 myUsername: user.username,
@@ -543,11 +544,13 @@ class _MyMembership extends StatelessWidget {
 /// Daftar tim dikelompokkan per bagian.
 class _CrewList extends StatelessWidget {
   const _CrewList({
+    required this.event,
     required this.crew,
     required this.roles,
     required this.myUsername,
   });
 
+  final EventItem event;
   final List<CrewMember> crew;
   final List<CrewRole> roles;
   final String myUsername;
@@ -628,6 +631,16 @@ class _CrewList extends StatelessWidget {
                                 fontSize: 12.5,
                               ),
                             ),
+                            if (event.isMultiDay) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                crewAttendanceLabel(event, m),
+                                style: textTheme.bodySmall?.copyWith(
+                                  fontSize: 12,
+                                  color: context.inkSecondary,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
