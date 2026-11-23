@@ -45,6 +45,7 @@ class ApiAuthRepository implements AuthRepository {
           (r) => r.name == (m['role'] ?? 'staff'),
           orElse: () => UserRole.staff,
         ),
+        division: (m['division'] ?? '').toString(),
         mustChangePassword: (m['mustChangePassword'] as bool?) ?? false,
         profileIncomplete: (m['profileIncomplete'] as bool?) ?? false,
       );

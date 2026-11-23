@@ -57,6 +57,13 @@ class ApiOvertimeRepository implements OvertimeRepository {
     return RequestStatus.pending;
   }
 
+  OvertimeSlot _slot(Object? v) {
+    for (final s in OvertimeSlot.values) {
+      if (s.name == v) return s;
+    }
+    return OvertimeSlot.single;
+  }
+
   OvertimeRequest _req(Map<String, dynamic> m) => OvertimeRequest(
         id: (m['id'] ?? '').toString(),
         date: apiDateTime(m['date']),
@@ -66,15 +73,20 @@ class ApiOvertimeRepository implements OvertimeRepository {
         status: _status(m['status']),
         submittedAt:
             apiDateTime(m['submittedAt']),
+        slot: _slot(m['slot']),
         reviewedBy: m['reviewedBy'] as String?,
         reviewedAt: apiDateTimeOpt(m['reviewedAt']),
         reviewerNote: m['reviewerNote'] as String?,
       );
 
   @override
-  Future<List<OvertimeRequest>> fetchRequests(AuthUser user) async {
+  Future<List<OvertimeRequest>> fetchRequests(AuthUser user,
+      {String? username}) async {
+    final target = username == null || username.isEmpty
+        ? ''
+        : '?username=${Uri.encodeComponent(username)}';
     final res = await _client.get(
-      Uri.parse('$_base/overtime/requests'),
+      Uri.parse('$_base/overtime/requests$target'),
       headers: await _h(),
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
@@ -91,6 +103,7 @@ class ApiOvertimeRepository implements OvertimeRepository {
     required DateTime start,
     required DateTime end,
     required String reason,
+    OvertimeSlot slot = OvertimeSlot.single,
   }) async {
     final res = await _client.post(
       Uri.parse('$_base/overtime/requests'),
@@ -100,6 +113,7 @@ class ApiOvertimeRepository implements OvertimeRepository {
         'start': start.toIso8601String(),
         'end': end.toIso8601String(),
         'reason': reason,
+        'slot': slot.name,
       }),
     );
     if (res.statusCode != 200 && res.statusCode != 201) {

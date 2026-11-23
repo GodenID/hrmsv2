@@ -135,9 +135,13 @@ class _ReportsPageState extends State<ReportsPage> {
           Future.wait([
             for (final e in employees)
               () async {
-                leaves[e.username] = await deps.leave.fetchRequests(user);
+                leaves[e.username] = await deps.leave.fetchRequests(
+                  user,
+                  username: e.username,
+                );
                 overtimes[e.username] = await deps.overtime.fetchRequests(
                   user,
+                  username: e.username,
                 );
               }(),
           ]),

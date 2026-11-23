@@ -20,8 +20,8 @@ abstract class LeaveRepository {
 
   Future<LeaveBalance> fetchBalance(AuthUser user);
 
-  /// Terbaru lebih dulu.
-  Future<List<LeaveRequest>> fetchRequests(AuthUser user);
+  /// Terbaru lebih dulu. [username] dipakai laporan Super Admin.
+  Future<List<LeaveRequest>> fetchRequests(AuthUser user, {String? username});
 
   Future<LeaveRequest> submit(
     AuthUser user, {

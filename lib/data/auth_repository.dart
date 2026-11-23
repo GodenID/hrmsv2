@@ -115,6 +115,7 @@ class AuthUser {
     required this.username,
     required this.fullName,
     required this.role,
+    this.division = '',
     this.mustChangePassword = false,
     this.profileIncomplete = false,
   });
@@ -122,6 +123,7 @@ class AuthUser {
   final String username;
   final String fullName;
   final UserRole role;
+  final String division;
 
   /// Login pertama (password sementara): wajib ganti sebelum masuk.
   final bool mustChangePassword;

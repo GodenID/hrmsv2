@@ -28,6 +28,7 @@ class ReportSheetData {
     required this.header,
     required this.rows,
     this.highlightRows = const {},
+    this.statusCellColors = const {},
   });
 
   final String title;
@@ -37,6 +38,9 @@ class ReportSheetData {
   /// Indeks baris (0-based, tanpa header) yang diberi fill biru muda,
   /// mis. baris berlembur di sheet Absensi.
   final Set<int> highlightRows;
+
+  /// Warna khusus kolom Kehadiran (indeks 5): baris -> hex warna.
+  final Map<int, String> statusCellColors;
 }
 
 /// Merakit [sheets] menjadi berkas .xlsx (header tebal + warna).
@@ -78,6 +82,20 @@ List<int>? buildWorkbookBytes(List<ReportSheetData> sheets) {
           cellStyle: highlightStyle,
         );
       }
+    }
+    for (final entry in sheet.statusCellColors.entries) {
+      final r = entry.key;
+      if (r < 0 || r >= sheet.rows.length || sheet.rows[r].length <= 5) {
+        continue;
+      }
+      grid.updateCell(
+        CellIndex.indexByColumnRow(columnIndex: 5, rowIndex: r + 1),
+        _cell(sheet.rows[r][5]),
+        cellStyle: CellStyle(
+          backgroundColorHex: ExcelColor.fromHexString(entry.value),
+          fontColorHex: ExcelColor.fromHexString('#0F2A24'),
+        ),
+      );
     }
   }
   if (sheets.isNotEmpty) excel.delete('Sheet1');
@@ -160,20 +178,26 @@ ReportSheetData attendanceSheet({
     return day.status.label;
   }
 
-  OvertimeRequest? overtimeFor(String username, DateTime day) {
-    for (final o in overtimeByUser[username] ?? const <OvertimeRequest>[]) {
-      if (o.status != RequestStatus.approved) continue;
-      if (o.date.year == day.year &&
-          o.date.month == day.month &&
-          o.date.day == day.day) {
-        return o;
-      }
-    }
-    return null;
+  String? statusColorOf(AttendanceDay? day) {
+    if (day == null) return null;
+    if (day.status == AttendanceDayStatus.late) return '#F8CBAD';
+    final leave = day.leave;
+    if (leave == null) return null;
+    return leave.type == LeaveType.sick ? '#FCDCEA' : '#D6E4FD';
   }
+
+  List<OvertimeRequest> overtimeFor(String username, DateTime day) => [
+        for (final o in overtimeByUser[username] ?? const <OvertimeRequest>[])
+          if (o.status == RequestStatus.approved &&
+              o.date.year == day.year &&
+              o.date.month == day.month &&
+              o.date.day == day.day)
+            o,
+      ];
 
   final rows = <List<Object?>>[];
   final highlight = <int>{};
+  final statusColors = <int, String>{};
   final sorted = [...employees]
     ..sort((a, b) => a.fullName.compareTo(b.fullName));
   for (final e in sorted) {
@@ -186,8 +210,14 @@ ReportSheetData attendanceSheet({
     while (!day.isAfter(last)) {
       final info =
           byDate['${day.year}-${day.month}-${day.day}'];
-      final overtime = overtimeFor(e.username, day);
-      if (overtime != null) highlight.add(rows.length);
+      final overtimes = overtimeFor(e.username, day);
+      if (overtimes.isNotEmpty) highlight.add(rows.length);
+      final color = statusColorOf(info);
+      if (color != null) statusColors[rows.length] = color;
+      final overtimeMinutes = overtimes.fold<Duration>(
+        Duration.zero,
+        (total, o) => total + o.duration,
+      );
       rows.add([
         _date(day),
         e.fullName,
@@ -202,9 +232,13 @@ ReportSheetData attendanceSheet({
             : DateFormatId.duration(info!.worked!),
         info?.clockInLocation ?? '—',
         info?.clockOutLocation ?? '—',
-        overtime == null ? '—' : 'Ya',
-        overtime?.timeRangeLabel ?? '—',
-        overtime?.durationLabel ?? '—',
+        overtimes.isEmpty ? '—' : 'Ya',
+        overtimes.isEmpty
+            ? '—'
+            : overtimes.map((o) => o.timeRangeLabel).join('; '),
+        overtimeMinutes == Duration.zero
+            ? '—'
+            : DateFormatId.duration(overtimeMinutes),
       ]);
       day = DateTime(day.year, day.month, day.day + 1);
     }
@@ -229,6 +263,7 @@ ReportSheetData attendanceSheet({
     ],
     rows: rows,
     highlightRows: highlight,
+    statusCellColors: statusColors,
   );
 }
 

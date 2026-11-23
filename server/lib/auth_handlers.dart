@@ -42,6 +42,7 @@ Map<String, dynamic> userJson(Map<String, dynamic> r) => {
       'username': r['username'],
       'fullName': r['full_name'],
       'role': r['role'],
+      'division': r['division'],
       'mustChangePassword': r['must_change_password'] == true,
       'profileIncomplete': r['profile_complete'] != true,
     };

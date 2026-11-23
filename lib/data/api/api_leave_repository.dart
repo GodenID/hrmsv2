@@ -144,9 +144,13 @@ class ApiLeaveRepository implements LeaveRepository {
   }
 
   @override
-  Future<List<LeaveRequest>> fetchRequests(AuthUser user) async {
+  Future<List<LeaveRequest>> fetchRequests(AuthUser user,
+      {String? username}) async {
+    final target = username == null || username.isEmpty
+        ? ''
+        : '?username=${Uri.encodeComponent(username)}';
     final res = await _client.get(
-      Uri.parse('$_base/leave/requests'),
+      Uri.parse('$_base/leave/requests$target'),
       headers: await _h(),
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);

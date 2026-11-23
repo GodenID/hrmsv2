@@ -238,6 +238,16 @@ class OvertimeReviewItem {
   final OvertimeRequest request;
 }
 
+enum OvertimeSlot {
+  single('Lembur'),
+  morning('Lembur pagi'),
+  evening('Lembur malam');
+
+  const OvertimeSlot(this.label);
+
+  final String label;
+}
+
 class OvertimeRequest {
   const OvertimeRequest({
     required this.id,
@@ -247,6 +257,7 @@ class OvertimeRequest {
     required this.reason,
     required this.status,
     required this.submittedAt,
+    this.slot = OvertimeSlot.single,
     this.reviewedBy,
     this.reviewedAt,
     this.reviewerNote,
@@ -259,6 +270,7 @@ class OvertimeRequest {
   final String reason;
   final RequestStatus status;
   final DateTime submittedAt;
+  final OvertimeSlot slot;
   final String? reviewedBy;
   final DateTime? reviewedAt;
   final String? reviewerNote;
@@ -268,8 +280,9 @@ class OvertimeRequest {
   /// Mis. "3 jam 30 menit".
   String get durationLabel => DateFormatId.duration(duration);
 
-  /// Mis. "18.00 – 21.30".
+  /// Mis. "Lembur pagi 03.00 – 05.00". Lembur biasa tanpa awalan.
   String get timeRangeLabel =>
+      '${slot == OvertimeSlot.single ? '' : '${slot.label} '}'
       '${DateFormatId.time(start)} – ${DateFormatId.time(end)}';
 
   OvertimeRequest copyWith({
@@ -286,6 +299,7 @@ class OvertimeRequest {
       reason: reason,
       status: status ?? this.status,
       submittedAt: submittedAt,
+      slot: slot,
       reviewedBy: reviewedBy ?? this.reviewedBy,
       reviewedAt: reviewedAt ?? this.reviewedAt,
       reviewerNote: reviewerNote ?? this.reviewerNote,
@@ -404,6 +418,7 @@ class AttendanceDay {
     this.correction,
     this.outOfArea,
     this.overtime,
+    this.overtimes = const [],
   });
 
   final DateTime date;
@@ -428,6 +443,10 @@ class AttendanceDay {
   /// Pengajuan lembur terakhir (menunggu/disetujui) untuk tanggal ini,
   /// bila ada.
   final OvertimeRequest? overtime;
+
+  /// Semua pengajuan lembur untuk tanggal ini. Produksi Mutiari bisa punya
+  /// satu slot pagi dan satu slot malam sekaligus.
+  final List<OvertimeRequest> overtimes;
 
   /// Mis. "Cuti tahunan".
   String? get leaveLabel => leave?.type.label;

@@ -124,6 +124,7 @@ class _LoginPageState extends State<LoginPage> {
         username: user.username,
         fullName: user.fullName,
         role: user.role,
+        division: user.division,
         profileIncomplete: user.profileIncomplete,
       );
     }

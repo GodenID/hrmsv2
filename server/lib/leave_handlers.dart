@@ -31,6 +31,32 @@ class _Http implements Exception {
   final String message;
 }
 
+String normalizedDivision(Object? value) => value
+    .toString()
+    .trim()
+    .toLowerCase()
+    .replaceAll(RegExp(r'[\s_-]+'), '');
+
+/// Target laporan: default akun yang login. Username lain hanya Super Admin.
+Future<Map<String, dynamic>> reportTarget(
+  Db db,
+  Map<String, dynamic> actor,
+  String? requested,
+) async {
+  final name = (requested ?? '').trim().toLowerCase();
+  if (name.isEmpty || name == (actor['username'] as String).toLowerCase()) {
+    return actor;
+  }
+  if (actor['role'] != 'superadmin') {
+    throw const _Http(403, 'Hanya Super Admin yang dapat melihat data karyawan lain.');
+  }
+  final rows = await db.pool.runTx((tx) => tx.execute(Sql.named(
+        'SELECT * FROM users WHERE LOWER(username)=@u',
+      ), parameters: {'u': name}));
+  if (rows.isEmpty) throw const _Http(404, 'Karyawan tidak ditemukan.');
+  return rows.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
+}
+
 // ---------- kalender kerja: lihat dates.dart ----------
 
 const annualQuota = 12;
@@ -114,6 +140,7 @@ Map<String, dynamic> overtimeJson(Map<String, dynamic> r) => {
       'reason': r['reason'],
       'status': r['status'],
       'submittedAt': isoUtc(r['submitted_at'] as DateTime),
+      'slot': (r['slot'] ?? 'single').toString(),
       'reviewedBy': r['reviewed_by'],
       'reviewedAt': isoUtcOpt(r['reviewed_at'] as DateTime?),
       'reviewerNote': r['reviewer_note'],
@@ -159,7 +186,9 @@ Router leaveRouter(Db db, Config cfg) {
 
   r.get('/leave/requests', (Request req) async {
     try {
-      final u = await me(req);
+      final actor = await me(req);
+      final u = await reportTarget(
+          db, actor, req.url.queryParameters['username']);
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named(
             'SELECT * FROM leave_requests WHERE user_id=@i::uuid ORDER BY submitted_at DESC',
           ), parameters: {'i': (u['id'] as Object).toString()}));
@@ -740,7 +769,9 @@ Router overtimeRouter(Db db, Config cfg) {
 
   r.get('/overtime/requests', (Request req) async {
     try {
-      final u = await me(req);
+      final actor = await me(req);
+      final u = await reportTarget(
+          db, actor, req.url.queryParameters['username']);
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named(
             'SELECT * FROM overtime_requests WHERE user_id=@i::uuid ORDER BY submitted_at DESC',
           ), parameters: {'i': (u['id'] as Object).toString()}));
@@ -781,6 +812,25 @@ Router overtimeRouter(Db db, Config cfg) {
       if (reason.length < 10) {
         throw const _Http(422, 'Keterangan minimal 10 karakter.');
       }
+      // Produksi Mutiari memakai dua slot per tanggal: pagi dan malam.
+      // Divisi lain tetap satu pengajuan tanpa pilihan slot.
+      final rawSlot = (b['slot'] ?? '').toString().trim().toLowerCase();
+      final isProduksiMutiari =
+          normalizedDivision(u['division']) == 'produksimutiari';
+      late final String slot;
+      if (isProduksiMutiari) {
+        if (rawSlot != 'morning' && rawSlot != 'evening') {
+          throw const _Http(422, 'Pilih lembur pagi atau lembur malam.');
+        }
+        slot = rawSlot;
+      } else {
+        slot = 'single';
+      }
+      final slotLabel = switch (slot) {
+        'morning' => 'pagi',
+        'evening' => 'malam',
+        _ => '',
+      };
       final created = await db.pool.runTx((tx) async {
         final clash = await tx.execute(Sql.named('''
           SELECT type FROM leave_requests WHERE user_id=@i::uuid
@@ -795,23 +845,27 @@ Router overtimeRouter(Db db, Config cfg) {
         }
         final dup = await tx.execute(Sql.named('''
           SELECT 1 FROM overtime_requests WHERE user_id=@i::uuid AND date=@d
-            AND status IN ('pending','approved') LIMIT 1
+            AND slot=@slot AND status IN ('pending','approved') LIMIT 1
         '''), parameters: {
           'i': (u['id'] as Object).toString(),
           'd': day.toIso8601String().substring(0, 10),
+          'slot': slot,
         });
         if (dup.isNotEmpty) {
-          throw const _Http(400, 'Sudah ada pengajuan lembur untuk tanggal ini.');
+          throw _Http(400, slotLabel.isEmpty
+              ? 'Sudah ada pengajuan lembur untuk tanggal ini.'
+              : 'Sudah ada pengajuan lembur $slotLabel untuk tanggal ini.');
         }
         final ins = await tx.execute(Sql.named('''
-          INSERT INTO overtime_requests(user_id, date, start_time, end_time, reason)
-          VALUES(@i::uuid, @d, @s, @e, @r) RETURNING *
+          INSERT INTO overtime_requests(user_id, date, start_time, end_time, reason, slot)
+          VALUES(@i::uuid, @d, @s, @e, @r, @slot) RETURNING *
         '''), parameters: {
           'i': (u['id'] as Object).toString(),
           'd': day.toIso8601String().substring(0, 10),
           's': ss.toUtc().toIso8601String(),
           'e': ee.toUtc().toIso8601String(),
           'r': reason,
+          'slot': slot,
         });
         final row = ins.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         for (final rev in await reviewersFor(

@@ -8,6 +8,7 @@ export 'attendance_repository.dart'
         RequestStatus,
         ReviewRules,
         OvertimeRequest,
+        OvertimeSlot,
         OvertimeReviewItem,
         OvertimeRules;
 export 'employee.dart';
@@ -27,8 +28,8 @@ export 'employee.dart';
 abstract class OvertimeRepository {
   Listenable get changes;
 
-  /// Terbaru lebih dulu.
-  Future<List<OvertimeRequest>> fetchRequests(AuthUser user);
+  /// Terbaru lebih dulu. [username] dipakai laporan Super Admin.
+  Future<List<OvertimeRequest>> fetchRequests(AuthUser user, {String? username});
 
   /// [date] tanggal lembur; [start]/[end] jam mulai–selesai pada tanggal
   /// itu.
@@ -38,6 +39,7 @@ abstract class OvertimeRepository {
     required DateTime start,
     required DateTime end,
     required String reason,
+    OvertimeSlot slot = OvertimeSlot.single,
   });
 
   /// Hanya untuk pengajuan berstatus menunggu.

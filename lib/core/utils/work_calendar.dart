@@ -7,9 +7,16 @@ abstract final class WorkPolicy {
   static const int latestOnTimeMinute = 0;
   static const int produksiMutiariLatestOnTimeHour = 8;
 
+  /// Kode master divisi Produksi Mutiari.
+  static const String produksiMutiariDivision = 'produksiMutiari';
+
   /// Koreksi absensi hanya untuk N hari ke belakang.
   static const int correctionWindowDays = 30;
 }
+
+bool isProduksiMutiariDivision(String? division) =>
+    (division ?? '').trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '') ==
+    'produksimutiari';
 
 abstract final class WorkCalendar {
   static DateTime dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);

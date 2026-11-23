@@ -160,10 +160,18 @@ class ApiAttendanceRepository implements AttendanceRepository {
         reason: (m['reason'] ?? '').toString(),
         status: _status(m['status']),
         submittedAt: _dt(m['submittedAt']) ?? DateTime.now(),
+        slot: _slot(m['slot']),
         reviewedBy: m['reviewedBy'] as String?,
         reviewedAt: _dt(m['reviewedAt']),
         reviewerNote: m['reviewerNote'] as String?,
       );
+
+  OvertimeSlot _slot(Object? v) {
+    for (final s in OvertimeSlot.values) {
+      if (s.name == v) return s;
+    }
+    return OvertimeSlot.single;
+  }
 
   EmployeeRef _ref(Map<String, dynamic> m) => EmployeeRef(
         username: (m['username'] ?? '').toString(),
@@ -293,6 +301,10 @@ class ApiAttendanceRepository implements AttendanceRepository {
             overtime: _map(e)['overtime'] == null
                 ? null
                 : _overtime(_map(_map(e)['overtime'])),
+            overtimes: [
+              for (final o in (_map(e)['overtimes'] as List? ?? []))
+                _overtime(_map(o)),
+            ],
           ),
       ],
     );

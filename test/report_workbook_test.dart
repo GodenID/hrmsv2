@@ -120,6 +120,104 @@ void main() {
       expect(sheet.rows.single[13], '3 jam');
       expect(sheet.highlightRows, {0});
     });
+
+    test('dua slot lembur produksi mutiari tampil dalam satu baris', () {
+      final day = DateTime(2026, 9, 28);
+      final sheet = attendanceSheet(
+        employees: [employee(username: 'bagas', fullName: 'Bagas')],
+        daysByUsername: {
+          'bagas': [
+            AttendanceDay(date: day, status: AttendanceDayStatus.onTime),
+          ],
+        },
+        overtimeByUser: {
+          'bagas': [
+            OvertimeRequest(
+              id: 'OT-AM',
+              date: day,
+              start: DateTime(2026, 9, 28, 3),
+              end: DateTime(2026, 9, 28, 5),
+              reason: 'Lembur pagi.',
+              status: RequestStatus.approved,
+              submittedAt: DateTime(2026, 9, 28, 6),
+              slot: OvertimeSlot.morning,
+            ),
+            OvertimeRequest(
+              id: 'OT-PM',
+              date: day,
+              start: DateTime(2026, 9, 28, 20),
+              end: DateTime(2026, 9, 28, 22),
+              reason: 'Lembur malam.',
+              status: RequestStatus.approved,
+              submittedAt: DateTime(2026, 9, 28, 23),
+              slot: OvertimeSlot.evening,
+            ),
+          ],
+        },
+        start: day,
+        end: day,
+      );
+      expect(sheet.rows.single[12],
+          'Lembur pagi 03:00 – 05:00; Lembur malam 20:00 – 22:00');
+      expect(sheet.rows.single[13], '4 jam');
+      expect(sheet.highlightRows, {0});
+    });
+
+    test('warna cell Kehadiran: telat oranye, cuti biru, sakit pink', () {
+      final day = DateTime(2026, 9, 28);
+      final sheet = attendanceSheet(
+        employees: [
+          employee(username: 'a', fullName: 'A'),
+          employee(username: 'b', fullName: 'B'),
+          employee(username: 'c', fullName: 'C'),
+        ],
+        daysByUsername: {
+          'a': [
+            AttendanceDay(date: day, status: AttendanceDayStatus.late),
+          ],
+          'b': [
+            AttendanceDay(
+              date: day,
+              status: AttendanceDayStatus.leave,
+              leave: LeaveRequest(
+                id: 'LV-A',
+                type: LeaveType.annual,
+                start: day,
+                end: day,
+                workingDays: 1,
+                reason: 'Cuti.',
+                status: RequestStatus.approved,
+                submittedAt: day,
+              ),
+            ),
+          ],
+          'c': [
+            AttendanceDay(
+              date: day,
+              status: AttendanceDayStatus.leave,
+              leave: LeaveRequest(
+                id: 'LV-S',
+                type: LeaveType.sick,
+                start: day,
+                end: day,
+                workingDays: 1,
+                reason: 'Sakit.',
+                status: RequestStatus.approved,
+                submittedAt: day,
+              ),
+            ),
+          ],
+        },
+        overtimeByUser: const {},
+        start: day,
+        end: day,
+      );
+      expect(sheet.statusCellColors, {
+        0: '#F8CBAD',
+        1: '#D6E4FD',
+        2: '#FCDCEA',
+      });
+    });
   });
 
   group('recap sheets', () {

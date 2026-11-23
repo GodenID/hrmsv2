@@ -28,6 +28,7 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
   DateTime? _date;
   TimeOfDay? _start;
   TimeOfDay? _end;
+  OvertimeSlot _slot = OvertimeSlot.morning;
   String? _dateError;
   String? _timeError;
   String? _error;
@@ -136,6 +137,10 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
         start: _startAt!,
         end: _endAt!,
         reason: _reasonController.text,
+        slot: isProduksiMutiariDivision(
+                SessionScope.userOf(context).division)
+            ? _slot
+            : OvertimeSlot.single,
       );
       if (!mounted) return;
       await showSuccessSheet(
@@ -163,6 +168,8 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final duration = _durationPreview;
+    final showSlot =
+        isProduksiMutiariDivision(SessionScope.userOf(context).division);
 
     return PageScaffold(
       title: 'Ajukan lembur',
@@ -190,6 +197,33 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
                 onTap: _pickDate,
               ),
             ),
+            if (showSlot) ...[
+              const SizedBox(height: AppSpacing.sm),
+              LabeledField(
+                label: 'Jenis lembur',
+                child: SegmentedButton<OvertimeSlot>(
+                  segments: [
+                    ButtonSegment(
+                      value: OvertimeSlot.morning,
+                      label: Text('Pagi'),
+                      icon: Icon(Icons.wb_sunny_outlined),
+                      enabled: !_isSubmitting,
+                    ),
+                    ButtonSegment(
+                      value: OvertimeSlot.evening,
+                      label: Text('Malam'),
+                      icon: Icon(Icons.nights_stay_outlined),
+                      enabled: !_isSubmitting,
+                    ),
+                  ],
+                  selected: {_slot},
+                  onSelectionChanged: (selected) {
+                    if (selected.isEmpty) return;
+                    setState(() => _slot = selected.first);
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: AppSpacing.sm),
             LayoutBuilder(
               builder: (context, constraints) {

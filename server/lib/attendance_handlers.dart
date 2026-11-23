@@ -101,6 +101,7 @@ Map<String, dynamic> overtimeOut(Map<String, dynamic> r) => {
       'reason': r['reason'],
       'status': r['status'],
       'submittedAt': isoUtc(r['submitted_at'] as DateTime),
+      'slot': (r['slot'] ?? 'single').toString(),
       'reviewedBy': r['reviewed_by'],
       'reviewedAt': isoUtcOpt(r['reviewed_at'] as DateTime?),
       'reviewerNote': r['reviewer_note'],
@@ -541,6 +542,16 @@ Router attendanceRouter(Db db, Config cfg) {
         return null;
       }
 
+      List<Map<String, dynamic>> allOn(
+          List<Map<String, dynamic>> rows, DateTime date) {
+        final k = dayKey(date);
+        return [
+          for (final m in rows)
+            if ((m['date'] as DateTime).toIso8601String().substring(0, 10) == k)
+              m,
+        ];
+      }
+
       final out = <Map<String, dynamic>>[];
       for (var d = 1; d <= lastDay; d++) {
         final date = DateTime(year, month, d);
@@ -625,6 +636,9 @@ Router attendanceRouter(Db db, Config cfg) {
           'leave': lv == null ? null : leaveOut(lv),
           'correction': corrLatest == null ? null : correctionJson(corrLatest),
           'overtime': otLatest == null ? null : overtimeOut(otLatest),
+          'overtimes': [
+            for (final m in allOn(otRows, date)) overtimeOut(m),
+          ],
           'outOfArea': ooaLatest == null ? null : ooaJson(ooaLatest),
         });
       }
