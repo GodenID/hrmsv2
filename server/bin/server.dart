@@ -60,6 +60,7 @@ Future<void> main() async {
   if (cfg.runMigrations) await runMigrations(db);
   await ensureEventCrewRoles(db);
   await ensureEventCrewDates(db);
+  await ensureOvertimeSlot(db);
 
   final auth = authRouter(db, cfg);
   final emp = employeeRouter(db, cfg);

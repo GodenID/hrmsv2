@@ -57,6 +57,18 @@ Future<Map<String, dynamic>> reportTarget(
   return rows.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
 }
 
+/// Pastikan kolom slot lembur ada walau migrasi otomatis tidak dijalankan.
+/// Idempoten: aman dipanggil setiap server mulai.
+Future<void> ensureOvertimeSlot(Db db) async {
+  await db.pool.runTx((tx) async {
+    await tx.execute(Sql.named('''
+      ALTER TABLE overtime_requests
+        ADD COLUMN IF NOT EXISTS slot TEXT NOT NULL DEFAULT 'single'
+        CHECK (slot IN ('single', 'morning', 'evening'))
+    '''));
+  });
+}
+
 // ---------- kalender kerja: lihat dates.dart ----------
 
 const annualQuota = 12;
