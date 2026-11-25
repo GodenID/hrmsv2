@@ -33,7 +33,7 @@ class _Http implements Exception {
 }
 
 const leaveExts = {'pdf', 'jpg', 'jpeg', 'png'};
-const avatarExts = {'png', 'jpg', 'jpeg'};
+const avatarExts = {'png', 'jpg', 'jpeg', 'gif'};
 const maxFileBytes = 2 * 1024 * 1024;
 
 String _maskNik(String nik) {
@@ -76,6 +76,7 @@ Router uploadRouter(Db db, Config cfg) {
       final maxBytes = switch (purpose) {
         'announcement' => 5 * 1024 * 1024,
         'apk' => 300 * 1024 * 1024,
+        'avatar' when ext == 'gif' => 5 * 1024 * 1024,
         _ => maxFileBytes,
       };
       final allowed = switch (purpose) {
@@ -85,7 +86,7 @@ Router uploadRouter(Db db, Config cfg) {
       };
       if (!allowed.contains(ext)) {
         throw _Http(422, switch (purpose) {
-          'avatar' => 'Foto harus PNG atau JPG.',
+          'avatar' => 'Foto harus PNG, JPG, atau GIF.',
           'apk' => 'Berkas rilis harus .apk.',
           _ => 'Lampiran harus PDF / JPG / PNG.',
         });
@@ -94,6 +95,7 @@ Router uploadRouter(Db db, Config cfg) {
         throw _Http(422, switch (purpose) {
           'announcement' => 'Ukuran file maksimal 5 MB.',
           'apk' => 'Ukuran APK maksimal 300 MB.',
+          'avatar' when ext == 'gif' => 'Ukuran GIF maksimal 5 MB.',
           _ => 'Ukuran file maksimal 2 MB.',
         });
       }

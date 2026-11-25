@@ -213,8 +213,9 @@ Router eventRouter(Db db, Config cfg) {
       'startDate': (e['start_date'] as DateTime).toIso8601String().substring(0, 10),
       'endDate': (e['end_date'] as DateTime).toIso8601String().substring(0, 10),
       'location': e['location'],
-      // Nilai PO terbuka untuk semua role (keputusan produk).
-      'poValue': po,
+      // Nilai PO hanya untuk Manager/BOD/Super Admin. Staff melihat ukuran
+      // event (size) tanpa nominalnya.
+      'poValue': viewer['role'] == 'staff' ? null : po,
       'size': classify(po, thr),
       'createdBy': e['created_by'],
       'roles': [

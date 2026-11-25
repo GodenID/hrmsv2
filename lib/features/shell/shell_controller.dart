@@ -16,6 +16,7 @@ enum ShellTab {
   masterData,
   webAdjustment,
   webTesting,
+  loans,
 }
 
 /// Aksi navigasi tingkat shell yang bisa dipanggil dari halaman mana pun

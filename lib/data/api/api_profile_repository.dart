@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
 import '../../core/session_storage.dart';
+import '../../core/utils/image_bytes.dart';
 import 'api_time.dart';
 import '../auth_repository.dart';
 import '../profile_repository.dart';
@@ -123,21 +124,29 @@ class ApiProfileRepository implements ProfileRepository {
     return img.bodyBytes;
   }
 
-  String _photoContentType(Uint8List bytes) =>
-      bytes.length >= 8 &&
-              bytes[0] == 0x89 &&
-              bytes[1] == 0x50 &&
-              bytes[2] == 0x4E &&
-              bytes[3] == 0x47
-          ? 'image/png'
-          : 'image/jpeg';
+  String _photoContentType(Uint8List bytes) {
+    if (isGifBytes(bytes)) return 'image/gif';
+    return bytes.length >= 8 &&
+            bytes[0] == 0x89 &&
+            bytes[1] == 0x50 &&
+            bytes[2] == 0x4E &&
+            bytes[3] == 0x47
+        ? 'image/png'
+        : 'image/jpeg';
+  }
 
   @override
   Future<void> updatePhoto(AuthUser user, {required Uint8List bytes}) async {
+    final type = _photoContentType(bytes);
+    final ext = switch (type) {
+      'image/gif' => 'gif',
+      'image/png' => 'png',
+      _ => 'jpg',
+    };
     final key = await _uploader.upload(
       purpose: 'avatar',
-      filename: 'avatar.${_photoContentType(bytes) == 'image/png' ? 'png' : 'jpg'}',
-      contentType: _photoContentType(bytes),
+      filename: 'avatar.$ext',
+      contentType: type,
       bytes: bytes,
     );
     final res = await _client.put(

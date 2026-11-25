@@ -20,6 +20,7 @@ import '../dashboard/dashboard_page.dart';
 import '../employees/employee_list_page.dart';
 import '../events/event_list_page.dart';
 import '../leave/leave_page.dart';
+import '../loans/loans_page.dart';
 import '../notifications/broadcast_page.dart';
 import '../reports/reports_page.dart';
 import '../settings/master_data_page.dart';
@@ -92,6 +93,15 @@ List<_Destination> _destinationsFor(UserRole role) {
       selectedIcon: Icons.festival,
       builder: (_) => const EventListPage(),
       primaryOnMobile: !manages,
+    ),
+    _Destination(
+      tab: ShellTab.loans,
+      label: 'Peminjaman',
+      icon: Icons.account_balance_wallet_outlined,
+      selectedIcon: Icons.account_balance_wallet,
+      builder: (_) => const LoansPage(),
+      section: _Section.manage,
+      primaryOnMobile: false,
     ),
     if (role.canReviewRequests)
       _Destination(

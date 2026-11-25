@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
 import '../../core/theme/theme_colors.dart';
 import '../../core/utils/date_format_id.dart';
+import '../../core/utils/image_bytes.dart';
 import '../../core/widgets/page_scaffold.dart';
 import '../../core/widgets/panel.dart';
 import '../../core/widgets/role_badge.dart';
@@ -157,17 +158,27 @@ class _ProfilePageState extends State<ProfilePage> {
       return;
     }
 
-    final Uint8List? edited;
-    try {
-      edited = await showPhotoEditor(context, picked.bytes);
-    } on PhotoDecodeException {
-      if (mounted) {
-        showAppSnackBar(
-          context,
-          'Foto tidak dapat dibuka. Pilih file JPG, PNG, atau WebP.',
-        );
-      }
+    final isGif = isGifBytes(picked.bytes);
+    if (isGif && picked.bytes.length > 5 * 1024 * 1024) {
+      showAppSnackBar(context, 'Ukuran GIF maksimal 5 MB.');
       return;
+    }
+    final Uint8List? edited;
+    if (isGif) {
+      // GIF dipakai apa adanya supaya animasinya tidak hilang saat crop.
+      edited = picked.bytes;
+    } else {
+      try {
+        edited = await showPhotoEditor(context, picked.bytes);
+      } on PhotoDecodeException {
+        if (mounted) {
+          showAppSnackBar(
+            context,
+            'Foto tidak dapat dibuka. Pilih file JPG, PNG, WebP, atau GIF.',
+          );
+        }
+        return;
+      }
     }
     if (edited == null || !mounted) return;
 

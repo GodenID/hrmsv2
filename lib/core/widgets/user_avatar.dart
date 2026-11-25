@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 
+import '../utils/image_bytes.dart';
 import 'initials_avatar.dart';
 
 /// Avatar bulat: foto profil bila ada, selain itu inisial nama.
@@ -10,7 +11,7 @@ class UserAvatar extends StatelessWidget {
 
   final String name;
 
-  /// Isi file foto (PNG / JPEG). null = tampilkan inisial.
+  /// Isi file foto (PNG / JPEG / GIF animasi). null = tampilkan inisial.
   final Uint8List? photo;
   final double size;
 
@@ -20,6 +21,7 @@ class UserAvatar extends StatelessWidget {
     if (bytes == null) return InitialsAvatar(name: name, size: size);
 
     // Decode seukuran tampilan agar hemat memori.
+    final isGif = isGifBytes(bytes);
     final cachePx = (size * MediaQuery.devicePixelRatioOf(context)).round();
     return ExcludeSemantics(
       child: Container(
@@ -36,8 +38,9 @@ class UserAvatar extends StatelessWidget {
             width: size,
             height: size,
             fit: BoxFit.cover,
-            cacheWidth: cachePx,
-            cacheHeight: cachePx,
+            // GIF perlu frame lengkap; resize memaksa decode satu frame.
+            cacheWidth: isGif ? null : cachePx,
+            cacheHeight: isGif ? null : cachePx,
             gaplessPlayback: true,
             filterQuality: FilterQuality.medium,
             errorBuilder: (_, _, _) => InitialsAvatar(name: name, size: size),
