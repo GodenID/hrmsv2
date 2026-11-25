@@ -24,4 +24,20 @@ void main() {
       expect(isLate(wib(9, 1)), isTrue);
     });
   });
+
+  group('wibWallClockToUtc', () {
+    final day = DateTime(2026, 11, 24);
+
+    test('jam dinding pagi dipertahankan saat ditampilkan kembali', () {
+      final utc = wibWallClockToUtc(day, 5, 0);
+      expect(utc.toIso8601String(), '2026-11-23T22:00:00.000Z');
+      expect(utc.add(const Duration(hours: 7)).hour, 5);
+    });
+
+    test('jam dinding malam dipertahankan', () {
+      final utc = wibWallClockToUtc(day, 20, 30);
+      expect(utc.toIso8601String(), '2026-11-24T13:30:00.000Z');
+      expect(utc.add(const Duration(hours: 7)).hour, 20);
+    });
+  });
 }

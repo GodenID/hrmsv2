@@ -32,6 +32,13 @@ String isoUtc(DateTime d) => d.toUtc().toIso8601String();
 
 String? isoUtcOpt(DateTime? d) => d?.toUtc().toIso8601String();
 
+/// Ubah jam dinding WIB yang diketik pengguna menjadi instant UTC.
+/// Klien mengirim jam tanpa zona (mis. "05:00"), jadi jangan dianggap UTC —
+/// kalau tidak, aplikasi akan menampilkannya 7 jam lebih lambat.
+DateTime wibWallClockToUtc(DateTime day, int hour, int minute) =>
+    DateTime.utc(day.year, day.month, day.day, hour, minute)
+        .subtract(const Duration(hours: 7));
+
 /// Batas masuk tiap divisi (WIB). Produksi Mutiari 08.00, divisi lain 09.00.
 const int latestOnTimeHourDefault = 9;
 const int latestOnTimeHourProduksiMutiari = 8;

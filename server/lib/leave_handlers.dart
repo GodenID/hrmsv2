@@ -816,8 +816,8 @@ Router overtimeRouter(Db db, Config cfg) {
       if (s == null || e == null || !e.isAfter(s)) {
         throw const _Http(422, 'Jam selesai harus setelah jam mulai pada tanggal yang sama.');
       }
-      final ss = DateTime(day.year, day.month, day.day, s.hour, s.minute);
-      final ee = DateTime(day.year, day.month, day.day, e.hour, e.minute);
+      final ss = wibWallClockToUtc(day, s.hour, s.minute);
+      final ee = wibWallClockToUtc(day, e.hour, e.minute);
       if (ee.difference(ss).inMinutes < 60) {
         throw const _Http(422, 'Durasi lembur minimal 60 menit (1 jam).');
       }
