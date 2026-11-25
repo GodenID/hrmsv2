@@ -54,6 +54,16 @@ Map<String, dynamic> locJson(Map<String, dynamic> r) => {      'id': r['id'],
       'radiusMeters': r['radius_meters'],
     };
 
+typedef AdjustmentEntry = ({
+  String username,
+  String userId,
+  String date,
+  DateTime clockIn,
+  DateTime clockOut,
+  String? clockInLocation,
+  String? clockOutLocation,
+});
+
 Map<String, dynamic> recordJson(Map<String, dynamic>? r, DateTime date) => {
       'date': date.toIso8601String().substring(0, 10),
       'clockIn': isoUtcOpt(r?['clock_in'] as DateTime?),
@@ -157,6 +167,68 @@ Router attendanceRouter(Db db, Config cfg) {
     final u = await authedUser(req, db, cfg);
     if (u == null) throw const _Http(401, 'Sesi berakhir. Silakan masuk kembali.');
     return u;
+  }
+
+  Future<AdjustmentEntry> resolveAdjustment(Map<String, dynamic> b) async {
+    final username = ((b['username'] ?? '') as String).trim().toLowerCase();
+    final rawDate = DateTime.tryParse(((b['date'] ?? '') as String));
+    final ciInput = DateTime.tryParse(((b['clockIn'] ?? '') as String));
+    final coInput = DateTime.tryParse(((b['clockOut'] ?? '') as String));
+    if (username.isEmpty || rawDate == null || ciInput == null || coInput == null) {
+      throw const _Http(422, 'Karyawan, tanggal, jam masuk, dan jam pulang wajib diisi.');
+    }
+    final day = dateOnly(rawDate);
+    if (day.isAfter(dateOnly(nowWib()))) {
+      throw const _Http(422, 'Tanggal tidak boleh mendatang.');
+    }
+    final clockIn = wibWallClockToUtc(day, ciInput.hour, ciInput.minute);
+    final clockOut = wibWallClockToUtc(day, coInput.hour, coInput.minute);
+    if (!clockOut.isAfter(clockIn)) {
+      throw const _Http(422, 'Jam pulang harus setelah jam masuk.');
+    }
+    String? loc(Object? v) {
+      final s = (v ?? '').toString().trim();
+      if (s.isEmpty) return null;
+      if (s.length > 120) {
+        throw const _Http(422, 'Nama lokasi maksimal 120 karakter.');
+      }
+      return s;
+    }
+
+    final target = await db.pool.runTx((tx) => tx.execute(Sql.named(
+          'SELECT id FROM users WHERE LOWER(username)=@u',
+        ), parameters: {'u': username}));
+    if (target.isEmpty) {
+      throw _Http(404, 'Karyawan "$username" tidak ditemukan.');
+    }
+    return (
+      username: username,
+      userId: (target.first.toColumnMap()['id'] as Object).toString(),
+      date: day.toIso8601String().substring(0, 10),
+      clockIn: clockIn,
+      clockOut: clockOut,
+      clockInLocation: loc(b['clockInLocation']),
+      clockOutLocation: loc(b['clockOutLocation']),
+    );
+  }
+
+  Future<void> writeAdjustment(TxSession tx, AdjustmentEntry a) async {
+    await tx.execute(Sql.named('''
+      INSERT INTO attendance_records(user_id, date, clock_in, clock_out,
+        clock_in_location, clock_out_location)
+      VALUES(@i::uuid, @d, @ci, @co, @cil, @col)
+      ON CONFLICT (user_id, date) DO UPDATE
+      SET clock_in=EXCLUDED.clock_in, clock_out=EXCLUDED.clock_out,
+          clock_in_location=EXCLUDED.clock_in_location,
+          clock_out_location=EXCLUDED.clock_out_location
+    '''), parameters: {
+      'i': a.userId,
+      'd': a.date,
+      'ci': a.clockIn.toIso8601String(),
+      'co': a.clockOut.toIso8601String(),
+      'cil': a.clockInLocation,
+      'col': a.clockOutLocation,
+    });
   }
 
   // ---------- lokasi ----------
@@ -655,46 +727,45 @@ Router attendanceRouter(Db db, Config cfg) {
       if (actor['role'] != 'superadmin') {
         throw const _Http(403, 'Hanya Super Admin yang dapat melakukan adjustment absensi.');
       }
-      final b = await readJson(req);
-      final username = ((b['username'] ?? '') as String).trim().toLowerCase();
-      final rawDate = DateTime.tryParse(((b['date'] ?? '') as String));
-      final ciInput = DateTime.tryParse(((b['clockIn'] ?? '') as String));
-      final coInput = DateTime.tryParse(((b['clockOut'] ?? '') as String));
-      if (username.isEmpty || rawDate == null || ciInput == null || coInput == null) {
-        throw const _Http(422, 'Karyawan, tanggal, jam masuk, dan jam pulang wajib diisi.');
+      final a = await resolveAdjustment(await readJson(req));
+      await db.pool.runTx((tx) => writeAdjustment(tx, a));
+      return json({'ok': true, 'username': a.username, 'date': a.date});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.post('/attendance/direct-adjust/bulk', (Request req) async {
+    try {
+      final actor = await me(req);
+      if (actor['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat melakukan adjustment absensi.');
       }
-      final day = dateOnly(rawDate);
-      if (day.isAfter(dateOnly(nowWib()))) {
-        throw const _Http(422, 'Tanggal tidak boleh mendatang.');
+      final raw = await readJson(req);
+      final rows = (raw['entries'] as List?) ?? const <Object>[];
+      if (rows.isEmpty) {
+        throw const _Http(422, 'Tidak ada baris untuk disimpan.');
       }
-      final clockIn = wibWallClockToUtc(day, ciInput.hour, ciInput.minute);
-      final clockOut = wibWallClockToUtc(day, coInput.hour, coInput.minute);
-      if (!clockOut.isAfter(clockIn)) {
-        throw const _Http(422, 'Jam pulang harus setelah jam masuk.');
+      if (rows.length > 500) {
+        throw const _Http(422, 'Maksimal 500 baris per sekali simpan.');
       }
-      final target = await db.pool.runTx((tx) => tx.execute(Sql.named(
-            'SELECT id FROM users WHERE LOWER(username)=@u',
-          ), parameters: {'u': username}));
-      if (target.isEmpty) {
-        throw const _Http(404, 'Karyawan tidak ditemukan.');
+      // Validasi semua baris dulu. Kalau ada yang salah, tidak ada yang
+      // ditulis — mencegah setengah data masuk.
+      final entries = <AdjustmentEntry>[];
+      for (final row in rows) {
+        if (row is! Map) {
+          throw const _Http(422, 'Format baris tidak dikenal.');
+        }
+        entries.add(await resolveAdjustment(
+          Map<String, dynamic>.from(row.map((k, v) => MapEntry(k.toString(), v))),
+        ));
       }
-      final userId = (target.first.toColumnMap()['id'] as Object).toString();
-      await db.pool.runTx((tx) => tx.execute(Sql.named('''
-        INSERT INTO attendance_records(user_id, date, clock_in, clock_out)
-        VALUES(@i::uuid, @d, @ci, @co)
-        ON CONFLICT (user_id, date) DO UPDATE
-        SET clock_in=EXCLUDED.clock_in, clock_out=EXCLUDED.clock_out
-      '''), parameters: {
-        'i': userId,
-        'd': day.toIso8601String().substring(0, 10),
-        'ci': clockIn.toIso8601String(),
-        'co': clockOut.toIso8601String(),
-      }));
-      return json({
-        'ok': true,
-        'username': username,
-        'date': day.toIso8601String().substring(0, 10),
+      await db.pool.runTx((tx) async {
+        for (final a in entries) {
+          await writeAdjustment(tx, a);
+        }
       });
+      return json({'ok': true, 'saved': entries.length});
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }

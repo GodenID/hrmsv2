@@ -16,6 +16,36 @@ export 'attendance_location.dart';
 ///
 /// Persetujuan koreksi: Manager (untuk Staff) & Super Admin (semua), tidak
 /// termasuk koreksi sendiri — WAJIB ditegakkan di server.
+/// Satu baris adjustment absensi dari tempelan spreadsheet.
+class AttendanceAdjustmentEntry {
+  const AttendanceAdjustmentEntry({
+    required this.username,
+    required this.date,
+    required this.clockIn,
+    required this.clockOut,
+    this.clockInLocation,
+    this.clockOutLocation,
+  });
+
+  final String username;
+  final DateTime date;
+
+  /// Jam dinding lokal (WIB), bukan instant UTC.
+  final DateTime clockIn;
+  final DateTime clockOut;
+  final String? clockInLocation;
+  final String? clockOutLocation;
+
+  Map<String, dynamic> toJson() => {
+        'username': username,
+        'date': date.toIso8601String().substring(0, 10),
+        'clockIn': clockIn.toIso8601String(),
+        'clockOut': clockOut.toIso8601String(),
+        'clockInLocation': clockInLocation ?? '',
+        'clockOutLocation': clockOutLocation ?? '',
+      };
+}
+
 abstract class AttendanceRepository {
   /// Berbunyi setiap ada perubahan (clock in/out, pengajuan koreksi),
   /// agar halaman lain bisa menyegarkan datanya.
@@ -54,6 +84,15 @@ abstract class AttendanceRepository {
     required DateTime date,
     required DateTime clockIn,
     required DateTime clockOut,
+    String? clockInLocation,
+    String? clockOutLocation,
+  });
+
+  /// Simpan banyak baris adjustment dalam satu transaksi.
+  /// Mengembalikan jumlah baris yang tersimpan.
+  Future<int> directAdjustBulk(
+    AuthUser actor, {
+    required List<AttendanceAdjustmentEntry> entries,
   });
 
   /// Hari-hari dalam satu bulan untuk kalender absensi, terbaru dulu:

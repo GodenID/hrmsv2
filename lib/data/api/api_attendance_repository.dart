@@ -276,6 +276,8 @@ class ApiAttendanceRepository implements AttendanceRepository {
     required DateTime date,
     required DateTime clockIn,
     required DateTime clockOut,
+    String? clockInLocation,
+    String? clockOutLocation,
   }) async {
     final res = await _client.post(
       Uri.parse('$_base/attendance/direct-adjust'),
@@ -285,10 +287,30 @@ class ApiAttendanceRepository implements AttendanceRepository {
         'date': date.toIso8601String().substring(0, 10),
         'clockIn': clockIn.toIso8601String(),
         'clockOut': clockOut.toIso8601String(),
+        'clockInLocation': clockInLocation ?? '',
+        'clockOutLocation': clockOutLocation ?? '',
       }),
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
     _ping();
+  }
+
+  @override
+  Future<int> directAdjustBulk(
+    AuthUser actor, {
+    required List<AttendanceAdjustmentEntry> entries,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/attendance/direct-adjust/bulk'),
+      headers: await _h(),
+      body: jsonEncode({
+        'entries': [for (final e in entries) e.toJson()],
+      }),
+    );
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    _ping();
+    return (m['saved'] as num?)?.toInt() ?? entries.length;
   }
 
   @override
