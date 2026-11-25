@@ -274,6 +274,15 @@ class _LeaveQuotaDialogState extends State<_LeaveQuotaDialog> {
           '${q.remaining} hari',
           color: q.reducible == 0 ? context.danger : null,
         ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Kuota direset otomatis tiap 1 Januari. Sisa cuti ${q.year - 1} '
+          'tidak dibawa ke ${q.year}.',
+          style: textTheme.bodySmall?.copyWith(
+            color: context.inkSecondary,
+            fontSize: 12,
+          ),
+        ),
         const SizedBox(height: AppSpacing.lg),
         const Divider(height: 1),
         const SizedBox(height: AppSpacing.lg),

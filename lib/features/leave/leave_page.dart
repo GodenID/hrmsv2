@@ -435,6 +435,15 @@ class _BalancePanel extends StatelessWidget {
               ),
             ],
           ),
+          const SizedBox(height: 10),
+          Text(
+            'Kuota direset otomatis tiap 1 Januari. Sisa cuti ${b.year - 1} '
+            'tidak dibawa ke tahun ini.',
+            style: textTheme.bodySmall?.copyWith(
+              color: context.inkSecondary,
+              fontSize: 12,
+            ),
+          ),
         ],
       ),
     );
