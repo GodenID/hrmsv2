@@ -347,8 +347,9 @@ class _EmployeeFormPageState extends State<EmployeeFormPage> {
                     ),
                     helperText: !canChangeRole
                         ? 'Role akun Anda sendiri tidak bisa diubah.'
-                        : me.role == UserRole.manager
-                        ? 'Manager hanya dapat membuat akun Staff.'
+                        : me.role == UserRole.manager ||
+                            me.role == UserRole.bod
+                        ? '${me.role.label} hanya dapat membuat akun Staff.'
                         : null,
                   ),
                 ),

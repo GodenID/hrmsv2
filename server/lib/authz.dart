@@ -35,12 +35,20 @@ Future<Map<String, dynamic>?> authedUser(
   });
 }
 
-bool canManageEmployees(String role) => role == 'manager' || role == 'superadmin';
+bool isManagerLike(String role) =>
+    role == 'manager' || role == 'bod' || role == 'superadmin';
 
-/// manager hanya boleh atas staff; superadmin atas semua.
+bool canManageEmployees(String role) => isManagerLike(role);
+
+/// Hak melihat laporan lintas karyawan: BOD & Super Admin.
+bool canViewReports(String role) => role == 'bod' || role == 'superadmin';
+
+/// Manager & BOD hanya boleh atas staff; superadmin atas semua.
 bool canManageRole(String actorRole, String targetRole) {
   if (actorRole == 'superadmin') return true;
-  if (actorRole == 'manager') return targetRole == 'staff';
+  if (actorRole == 'manager' || actorRole == 'bod') {
+    return targetRole == 'staff';
+  }
   return false;
 }
 

@@ -123,7 +123,7 @@ List<_Destination> _destinationsFor(UserRole role) {
         section: _Section.manage,
         primaryOnMobile: false,
       ),
-    if (role == UserRole.superadmin)
+    if (role.canViewReports)
       _Destination(
         tab: ShellTab.reports,
         label: 'Laporan',

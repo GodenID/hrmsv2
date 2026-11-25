@@ -55,10 +55,11 @@ abstract class AuthRepository {
   });
 }
 
-/// Tiga role pengguna Prasasti Connect.
+/// Empat role pengguna Prasasti Connect.
 enum UserRole {
   staff('Staff'),
   manager('Manager'),
+  bod('BOD'),
   superadmin('Super Admin');
 
   const UserRole(this.label);
@@ -67,7 +68,9 @@ enum UserRole {
 
   /// Hak kelola pengumuman (tambah/ubah/hapus) — Manager & Super Admin.
   bool get canManageAnnouncements =>
-      this == UserRole.manager || this == UserRole.superadmin;
+      this == UserRole.manager ||
+      this == UserRole.bod ||
+      this == UserRole.superadmin;
 
   /// Hak melihat siapa saja yang sudah/belum membaca pengumuman — semua
   /// role.
@@ -75,32 +78,45 @@ enum UserRole {
 
   /// Membuat, mengubah & menghapus event — Manager & Super Admin.
   bool get canManageEvents =>
-      this == UserRole.manager || this == UserRole.superadmin;
+      this == UserRole.manager ||
+      this == UserRole.bod ||
+      this == UserRole.superadmin;
 
   /// Mengatur ambang nilai PO (event kecil/sedang/besar) — Manager &
   /// Super Admin.
   bool get canManageEventThresholds =>
-      this == UserRole.manager || this == UserRole.superadmin;
+      this == UserRole.manager ||
+      this == UserRole.bod ||
+      this == UserRole.superadmin;
 
   /// Menyetujui / menolak cuti & koreksi absensi karyawan lain.
   bool get canReviewRequests =>
-      this == UserRole.manager || this == UserRole.superadmin;
+      this == UserRole.manager ||
+      this == UserRole.bod ||
+      this == UserRole.superadmin;
 
   /// Membuka menu Karyawan (daftar, tambah, ubah, nonaktifkan, reset
   /// password).
   bool get canManageEmployees =>
-      this == UserRole.manager || this == UserRole.superadmin;
+      this == UserRole.manager ||
+      this == UserRole.bod ||
+      this == UserRole.superadmin;
+
+  /// Membuka menu Laporan — BOD & Super Admin.
+  bool get canViewReports =>
+      this == UserRole.bod || this == UserRole.superadmin;
 
   /// Mengatur lokasi & radius absen — hanya Super Admin.
   bool get canManageAttendanceLocations => this == UserRole.superadmin;
 
   /// Apakah role ini boleh mengelola (dan memberikan) role [target].
   /// - Super Admin: semua role.
-  /// - Manager: hanya Staff.
+  /// - Manager & BOD: hanya Staff.
   /// Aturan yang sama dipakai untuk persetujuan cuti/koreksi.
   bool canManageRole(UserRole target) => switch (this) {
     UserRole.superadmin => true,
     UserRole.manager => target == UserRole.staff,
+    UserRole.bod => target == UserRole.staff,
     UserRole.staff => false,
   };
 

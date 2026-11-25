@@ -108,9 +108,11 @@ Router announcementRouter(Db db, Config cfg) {
   }
 
   void requireAnnouncementManager(Map<String, dynamic> actor) {
-    final role = actor['role'];
-    if (role != 'superadmin' && role != 'manager') {
-      throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat mengelola pengumuman.');
+    if (!isManagerLike(actor['role'] as String)) {
+      throw const _Http(
+        403,
+        'Hanya Manager, BOD, dan Super Admin yang dapat mengelola pengumuman.',
+      );
     }
   }
 

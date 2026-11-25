@@ -1,8 +1,20 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:hrms_app/data/employee_repository.dart';
 import 'package:hrms_app/data/registration.dart';
 
 void main() {
+  group('EmployeeRules.validatePhone', () {
+    test('minimal 10 dan maksimal 13 digit', () {
+      expect(EmployeeRules.validatePhone('081234567'), isNotNull);
+      expect(EmployeeRules.validatePhone('0812345678'), isNull);
+      expect(EmployeeRules.validatePhone('08123456789'), isNull);
+      expect(EmployeeRules.validatePhone('0812-3456-7890'), isNull);
+      expect(EmployeeRules.validatePhone('+62 812-3456-7890'), isNull);
+      expect(EmployeeRules.validatePhone('0812345678901234'), isNotNull);
+    });
+  });
+
   group('RegistrationRules.validateBirthPlace', () {
     test('wajib diisi', () {
       expect(RegistrationRules.validateBirthPlace(null), isNotNull);

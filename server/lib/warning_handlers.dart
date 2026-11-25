@@ -271,7 +271,7 @@ Router warningRouter(Db db, Config cfg) {
             Sql.named('SELECT role FROM users WHERE username=@u'),
             parameters: {'u': (letter['employeeUsername'] as String)}));
         final role = t.isEmpty ? 'staff' : (t.first.toColumnMap()['role'] as String);
-        if (canManageRole('manager', role)) filtered.add(d);
+        if (canManageRole('bod', role)) filtered.add(d);
       }
       // pengingat H-30 untuk superadmin
       if (actor['role'] == 'superadmin') {

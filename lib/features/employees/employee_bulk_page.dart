@@ -136,10 +136,13 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
       } else if (parts.length == 2) {
         final second = parts[1].trim();
         if (second.toLowerCase() == 'staff' ||
-            second.toLowerCase() == 'manager') {
-          role = second.toLowerCase() == 'staff'
-              ? UserRole.staff
-              : UserRole.manager;
+            second.toLowerCase() == 'manager' ||
+            second.toLowerCase() == 'bod') {
+          role = switch (second.toLowerCase()) {
+            'staff' => UserRole.staff,
+            'manager' => UserRole.manager,
+            _ => UserRole.bod,
+          };
           password = null;
         } else {
           password = second.isEmpty ? null : second;
@@ -148,11 +151,12 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
       } else {
         password = parts[1].trim().isEmpty ? null : parts[1].trim();
         final r = parts[2].trim().toLowerCase();
-        role = r.isEmpty
-            ? null
-            : (r == 'staff'
-                ? UserRole.staff
-                : (r == 'manager' ? UserRole.manager : null));
+        role = switch (r) {
+          'staff' => UserRole.staff,
+          'manager' => UserRole.manager,
+          'bod' => UserRole.bod,
+          _ => null,
+        };
       }
       out.add(
         BulkAccountSpec(
@@ -255,6 +259,10 @@ class _EmployeeBulkPageState extends State<EmployeeBulkPage> {
                       DropdownMenuItem(
                         value: UserRole.manager,
                         child: Text('Manager'),
+                      ),
+                      DropdownMenuItem(
+                        value: UserRole.bod,
+                        child: Text('BOD'),
                       ),
                     ],
                     onChanged: (r) => setState(() => _role = r ?? _role),

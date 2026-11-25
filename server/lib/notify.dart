@@ -74,7 +74,7 @@ Future<List<Map<String, dynamic>>> reviewersFor(
 ) async {
   final rs = await tx.execute(Sql.named('''
     SELECT username, full_name, role FROM users
-    WHERE active AND username<>@me AND role IN ('manager','superadmin')
+    WHERE active AND username<>@me AND role IN ('manager','bod','superadmin')
   '''), parameters: {'me': requesterUsername});
   return [
     for (final row in rs)
@@ -82,7 +82,8 @@ Future<List<Map<String, dynamic>>> reviewersFor(
   ].where((m) {
     final r = m['role'] as String;
     if (r == 'superadmin') return true;
-    return requesterRole == 'staff'; // manager hanya atas staff
+    // manager & BOD hanya atas staff.
+    return (r == 'manager' || r == 'bod') && requesterRole == 'staff';
   }).toList();
 }
 

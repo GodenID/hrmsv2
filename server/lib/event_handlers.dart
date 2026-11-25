@@ -135,7 +135,7 @@ Router eventRouter(Db db, Config cfg) {
     return m;
   }
 
-  bool canManage(String role) => role == 'manager' || role == 'superadmin';
+  bool canManage(String role) => isManagerLike(role);
 
   String? validateEvent(Map<String, dynamic> b) {
     if (((b['name'] ?? '') as String).trim().length < 3) {

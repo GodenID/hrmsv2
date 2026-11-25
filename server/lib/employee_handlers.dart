@@ -368,7 +368,7 @@ Router employeeRouter(Db db, Config cfg) {
           'div': code,
           'jd': DateTime.now().toUtc().toIso8601String().substring(0, 10),
           'em': '$name@testing.local',
-          'ph': '-',
+          'ph': '080000000000',
           'pw': BCrypt.hashpw(password, BCrypt.gensalt()),
         });
         return accountRow(tx, name);
@@ -408,7 +408,7 @@ Router employeeRouter(Db db, Config cfg) {
 
   r.post('/employees/bulk', (Request req) async {
     try {
-      await requireSuperAdmin(req);
+      final actor = await requireSuperAdmin(req);
       final b = await readJson(req);
       final rawAccounts = b['accounts'];
       final custom = rawAccounts is List;
@@ -450,8 +450,8 @@ Router employeeRouter(Db db, Config cfg) {
             throw _Http(409, 'Username "$username" duplikat dalam daftar.');
           }
           final role = ((m['role'] ?? 'staff') as Object).toString().trim().toLowerCase();
-          if (role != 'staff' && role != 'manager') {
-            throw _Http(422, 'Role "$role" tidak valid (Staff/Manager).');
+          if (!canManageRole(actor['role'] as String, role)) {
+            throw _Http(422, 'Role "$role" tidak dapat diberikan.');
           }
           final pw = ((m['password'] ?? '') as Object).toString();
           if (pw.isNotEmpty && !passwordOk(pw, username)) {
@@ -465,8 +465,8 @@ Router employeeRouter(Db db, Config cfg) {
           throw const _Http(422, 'Jumlah akun 1-50 per sekali buat.');
         }
         final role = ((b['role'] ?? 'staff') as String).trim().toLowerCase();
-        if (role != 'staff' && role != 'manager') {
-          throw const _Http(422, 'Role massal hanya Staff atau Manager.');
+        if (!canManageRole(actor['role'] as String, role)) {
+          throw const _Http(422, 'Role massal tidak dapat diberikan.');
         }
       }
 

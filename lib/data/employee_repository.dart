@@ -290,8 +290,8 @@ abstract final class EmployeeRules {
     final v = value?.trim() ?? '';
     if (v.isEmpty) return 'Nomor telepon wajib diisi';
     final digits = v.replaceAll(RegExp(r'\D'), '').length;
-    if (!phone.hasMatch(v) || digits < 9 || digits > 13) {
-      return 'Nomor telepon 9–13 digit, mis. 0812-3456-7890';
+    if (!phone.hasMatch(v) || digits < 10 || digits > 13) {
+      return 'Nomor telepon 10–13 digit, mis. 0812-3456-7890';
     }
     return null;
   }

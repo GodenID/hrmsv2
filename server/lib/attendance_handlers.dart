@@ -496,8 +496,8 @@ Router attendanceRouter(Db db, Config cfg) {
       if (requested != null &&
           requested.isNotEmpty &&
           requested != (u['username'] as String).toLowerCase()) {
-        if (u['role'] != 'superadmin') {
-          throw const _Http(403, 'Hanya Super Admin yang dapat melihat absensi karyawan lain.');
+        if (!canViewReports(u['role'] as String)) {
+          throw const _Http(403, 'Hanya BOD dan Super Admin yang dapat melihat absensi karyawan lain.');
         }
         final rows = await db.pool.runTx((tx) => tx.execute(Sql.named(
               'SELECT * FROM users WHERE LOWER(username)=@u',
@@ -828,7 +828,7 @@ Router attendanceRouter(Db db, Config cfg) {
   r.get('/attendance/corrections/queue', (Request req) async {
     try {
       final actor = await me(req);
-      if (actor['role'] != 'manager' && actor['role'] != 'superadmin') {
+      if (!isManagerLike(actor['role'] as String)) {
         throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat memproses koreksi.');
       }
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
@@ -1063,7 +1063,7 @@ Router attendanceRouter(Db db, Config cfg) {
   r.get('/attendance/out-of-area/queue', (Request req) async {
     try {
       final actor = await me(req);
-      if (actor['role'] != 'manager' && actor['role'] != 'superadmin') {
+      if (!isManagerLike(actor['role'] as String)) {
         throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat memproses pengajuan.');
       }
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''

@@ -23,6 +23,11 @@ class RoleBadge extends StatelessWidget {
         context.accentText,
         const Color(0xFFC6DDDA),
       ),
+      UserRole.bod => (
+        const Color(0xFFE9E1F6),
+        const Color(0xFF5B3FA8),
+        const Color(0xFFCBB9EC),
+      ),
       UserRole.superadmin => (
         context.ink,
         context.surface,

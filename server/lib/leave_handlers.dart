@@ -47,8 +47,8 @@ Future<Map<String, dynamic>> reportTarget(
   if (name.isEmpty || name == (actor['username'] as String).toLowerCase()) {
     return actor;
   }
-  if (actor['role'] != 'superadmin') {
-    throw const _Http(403, 'Hanya Super Admin yang dapat melihat data karyawan lain.');
+  if (!canViewReports(actor['role'] as String)) {
+    throw const _Http(403, 'Hanya BOD dan Super Admin yang dapat melihat data karyawan lain.');
   }
   final rows = await db.pool.runTx((tx) => tx.execute(Sql.named(
         'SELECT * FROM users WHERE LOWER(username)=@u',
@@ -373,7 +373,7 @@ Router leaveRouter(Db db, Config cfg) {
   r.get('/leave/queue', (Request req) async {
     try {
       final actor = await me(req);
-      if (actor['role'] != 'manager' && actor['role'] != 'superadmin') {
+      if (!isManagerLike(actor['role'] as String)) {
         throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat memproses pengajuan.');
       }
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
@@ -417,7 +417,7 @@ Router leaveRouter(Db db, Config cfg) {
   r.post('/leave/requests/<id>/review', (Request req, String id) async {
     try {
       final actor = await me(req);
-      if (actor['role'] != 'manager' && actor['role'] != 'superadmin') {
+      if (!isManagerLike(actor['role'] as String)) {
         throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat memproses pengajuan.');
       }
       final b = await readJson(req);
@@ -938,7 +938,7 @@ Router overtimeRouter(Db db, Config cfg) {
   r.get('/overtime/queue', (Request req) async {
     try {
       final actor = await me(req);
-      if (actor['role'] != 'manager' && actor['role'] != 'superadmin') {
+      if (!isManagerLike(actor['role'] as String)) {
         throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat memproses pengajuan.');
       }
       final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
@@ -971,7 +971,7 @@ Router overtimeRouter(Db db, Config cfg) {
   r.post('/overtime/requests/<id>/review', (Request req, String id) async {
     try {
       final actor = await me(req);
-      if (actor['role'] != 'manager' && actor['role'] != 'superadmin') {
+      if (!isManagerLike(actor['role'] as String)) {
         throw const _Http(403, 'Hanya Manager dan Super Admin yang dapat memproses pengajuan.');
       }
       final b = await readJson(req);
@@ -1220,7 +1220,7 @@ Router notificationRouter(Db db, Config cfg) {
           final m = row.toColumnMap();
           final role = (m['role'] ?? 'staff') as String;
           if (audience == 'staff' && role != 'staff') continue;
-          if (audience == 'managers' && role != 'manager' && role != 'superadmin') {
+          if (audience == 'managers' && !isManagerLike(role)) {
             continue;
           }
           targets.add(m['username'] as String);

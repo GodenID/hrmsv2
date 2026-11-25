@@ -509,9 +509,9 @@ class _EmployeeDetailPageState extends State<EmployeeDetailPage> {
                     ? 'Ini akun Anda. Role, status, dan password akun sendiri '
                           'tidak bisa diubah dari sini — gunakan Profil › '
                           'Ganti password.'
-                    : me.role == UserRole.manager
-                    ? 'Manager hanya dapat mengelola akun berrole Staff. '
-                          'Hubungi Super Admin untuk akun ini.'
+                    : me.role == UserRole.manager || me.role == UserRole.bod
+                    ? '${me.role.label} hanya dapat mengelola akun berrole '
+                          'Staff. Hubungi Super Admin untuk akun ini.'
                     : 'Anda tidak memiliki akses untuk mengelola akun ini.',
                 style: textTheme.bodySmall?.copyWith(height: 1.5),
               ),

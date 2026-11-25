@@ -26,13 +26,14 @@ Future<Response> approvalCount(
       return json({'message': 'Sesi berakhir. Silakan masuk kembali.'}, status: 401);
     }
     final role = actor['role'] as String;
-    if (role != 'manager' && role != 'superadmin') {
-      return json({'message': 'Hanya Manager dan Super Admin.'}, status: 403);
+    if (!isManagerLike(role)) {
+      return json({'message': 'Hanya Manager, BOD, dan Super Admin.'}, status: 403);
     }
     final me = (actor['username'] as String).toLowerCase();
 
-    // Manager hanya boleh memproses staff; Super Admin semua peran.
-    const scope = "AND (@role='superadmin' OR u.role='staff')";
+    // Manager & BOD hanya boleh memproses staff; Super Admin semua peran.
+    const scope =
+        "AND (@role IN ('superadmin','manager','bod') OR u.role='staff')";
 
     Future<int> count(String table, {bool active = false}) async {
       final activeSql = active ? 'AND u.active' : '';

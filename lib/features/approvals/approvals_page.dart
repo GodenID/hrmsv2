@@ -596,7 +596,8 @@ class _ApprovalsPageState extends State<ApprovalsPage> {
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
-          SessionScope.userOf(context).role == UserRole.manager
+          (SessionScope.userOf(context).role == UserRole.manager ||
+                  SessionScope.userOf(context).role == UserRole.bod)
               ? 'Anda memproses pengajuan karyawan berrole Staff.'
               : 'Anda dapat memproses pengajuan semua karyawan, termasuk '
                     'milik Anda sendiri.',

@@ -163,7 +163,7 @@ Router uploadRouter(Db db, Config cfg) {
         final m = row.first.toColumnMap().map((k, v) => MapEntry(k.toString(), v));
         final owner = m['username'] as String;
         final allowed = owner == u['username'] ||
-            ((u['role'] == 'manager' || u['role'] == 'superadmin') &&
+            (isManagerLike(u['role'] as String) &&
                 canManageRole(u['role'] as String, (m['urel'] ?? 'staff') as String));
         if (!allowed) throw const _Http(403, 'Anda tidak berhak membuka file ini.');
         return json({
