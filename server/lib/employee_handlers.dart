@@ -186,6 +186,7 @@ Router employeeRouter(Db db, Config cfg) {
             Sql.named('''
               SELECT u.*, d.label AS division_label
               FROM users u LEFT JOIN divisions d ON d.code=u.division
+              WHERE NOT COALESCE(u.is_testing, FALSE)
               ORDER BY u.full_name
             '''),
           ));
@@ -196,6 +197,30 @@ Router employeeRouter(Db db, Config cfg) {
       list.removeWhere(
           (e) => actor['role'] != 'superadmin' && (e['role'] == 'superadmin'));
       return json({'employees': list});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.get('/employees/testing', (Request req) async {
+    try {
+      final actor = await requireSuperAdmin(req);
+      final rows = await db.pool.runTx((tx) => tx.execute(Sql.named('''
+        SELECT u.*, d.label AS division_label
+        FROM users u LEFT JOIN divisions d ON d.code=u.division
+        WHERE COALESCE(u.is_testing, FALSE) ORDER BY u.username
+      ''')));
+      return json({
+        'employees': [
+          for (final row in rows)
+            toAccount(
+              row.toColumnMap().map((k, v) => MapEntry(k.toString(), v)),
+              actor,
+              storeOf(cfg),
+              cfg.s3avatarPublic,
+            ),
+        ],
+      });
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }
@@ -332,8 +357,8 @@ Router employeeRouter(Db db, Config cfg) {
         await tx.execute(Sql.named('''
           INSERT INTO users(username, full_name, role, nik, employee_id, position,
             division, employment_status, join_date, email, phone, password_hash,
-            must_change_password, profile_complete)
-          VALUES(@u,@fn,'staff',@nik,@eid,'Staf',@div,'external',@jd,@em,@ph,@pw,FALSE,TRUE)
+            must_change_password, profile_complete, is_testing)
+          VALUES(@u,@fn,'staff',@nik,@eid,'Staf',@div,'external',@jd,@em,@ph,@pw,FALSE,TRUE,TRUE)
           RETURNING username
         '''), parameters: {
           'u': name,

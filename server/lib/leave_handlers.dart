@@ -767,6 +767,25 @@ Router leaveRouter(Db db, Config cfg) {
     }
   });
 
+  r.delete('/leave/requests/<id>', (Request req, String id) async {
+    try {
+      final actor = await me(req);
+      if (actor['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat menghapus riwayat.');
+      }
+      await db.pool.runTx((tx) async {
+        final cur = await tx.execute(Sql.named(
+            'SELECT 1 FROM leave_requests WHERE id=@i::uuid'), parameters: {'i': id});
+        if (cur.isEmpty) throw const _Http(404, 'Pengajuan tidak ditemukan.');
+        await tx.execute(Sql.named(
+            'DELETE FROM leave_requests WHERE id=@i::uuid'), parameters: {'i': id});
+      });
+      return json({'ok': true});
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
   return r;
 }
 
@@ -1007,6 +1026,25 @@ Router overtimeRouter(Db db, Config cfg) {
         };
       });
       return json(done);
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
+  r.delete('/overtime/requests/<id>', (Request req, String id) async {
+    try {
+      final actor = await me(req);
+      if (actor['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat menghapus riwayat.');
+      }
+      await db.pool.runTx((tx) async {
+        final cur = await tx.execute(Sql.named(
+            'SELECT 1 FROM overtime_requests WHERE id=@i::uuid'), parameters: {'i': id});
+        if (cur.isEmpty) throw const _Http(404, 'Pengajuan tidak ditemukan.');
+        await tx.execute(Sql.named(
+            'DELETE FROM overtime_requests WHERE id=@i::uuid'), parameters: {'i': id});
+      });
+      return json({'ok': true});
     } on _Http catch (h) {
       return json({'message': h.message}, status: h.status);
     }
@@ -1257,42 +1295,5 @@ Router notificationRouter(Db db, Config cfg) {
     }
   });
 
-  r.delete('/leave/requests/<id>', (Request req, String id) async {
-    try {
-      final actor = await me(req);
-      if (actor['role'] != 'superadmin') {
-        throw const _Http(403, 'Hanya Super Admin yang dapat menghapus riwayat.');
-      }
-      await db.pool.runTx((tx) async {
-        final cur = await tx.execute(Sql.named(
-            'SELECT 1 FROM leave_requests WHERE id=@i::uuid'), parameters: {'i': id});
-        if (cur.isEmpty) throw const _Http(404, 'Pengajuan tidak ditemukan.');
-        await tx.execute(Sql.named(
-            'DELETE FROM leave_requests WHERE id=@i::uuid'), parameters: {'i': id});
-      });
-      return json({'ok': true});
-    } on _Http catch (h) {
-      return json({'message': h.message}, status: h.status);
-    }
-  });
-
-  r.delete('/overtime/requests/<id>', (Request req, String id) async {
-    try {
-      final actor = await me(req);
-      if (actor['role'] != 'superadmin') {
-        throw const _Http(403, 'Hanya Super Admin yang dapat menghapus riwayat.');
-      }
-      await db.pool.runTx((tx) async {
-        final cur = await tx.execute(Sql.named(
-            'SELECT 1 FROM overtime_requests WHERE id=@i::uuid'), parameters: {'i': id});
-        if (cur.isEmpty) throw const _Http(404, 'Pengajuan tidak ditemukan.');
-        await tx.execute(Sql.named(
-            'DELETE FROM overtime_requests WHERE id=@i::uuid'), parameters: {'i': id});
-      });
-      return json({'ok': true});
-    } on _Http catch (h) {
-      return json({'message': h.message}, status: h.status);
-    }
-  });
   return r;
 }

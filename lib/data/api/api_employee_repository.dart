@@ -140,6 +140,20 @@ class ApiEmployeeRepository implements EmployeeRepository {
   }
 
   @override
+  Future<List<EmployeeAccount>> fetchTestingAccounts(AuthUser actor) async {
+    final res = await _client.get(
+      Uri.parse('$_base/employees/testing'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    final list = (m['employees'] as List? ?? []);
+    return List.unmodifiable(
+      list.map((e) => _parse(e as Map<String, dynamic>)),
+    );
+  }
+
+  @override
   Future<EmployeeAccount> fetchEmployee(
     AuthUser actor, {
     required String username,

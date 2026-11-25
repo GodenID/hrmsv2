@@ -58,7 +58,10 @@ Future<void> main() async {
   final cfg = Config.fromEnv(Platform.environment)..validate();
   final db = await Db.open(cfg.databaseUrl);
   PushBus.configure(database: db, sender: FcmSender(cfg));
-  if (cfg.runMigrations) await runMigrations(db);
+  // Migrasi dijalankan setiap start. Semua statement sengaja idempoten, jadi
+  // aman diulang dan tidak bergantung pada env RUN_MIGRATIONS yang bisa
+  // tertinggal saat deploy.
+  await runMigrations(db);
   await ensureEventCrewRoles(db);
   await ensureEventCrewDates(db);
   await ensureOvertimeSlot(db);

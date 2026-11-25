@@ -577,6 +577,7 @@ class _TestingAccountPageState extends State<TestingAccountPage> {
   String? _error;
   List<String> _divisions = const [];
   Map<String, String> _divisionLabels = const {};
+  List<EmployeeAccount> _testingAccounts = const [];
   String? _division;
 
   @override
@@ -601,11 +602,14 @@ class _TestingAccountPageState extends State<TestingAccountPage> {
     });
     try {
       final user = SessionScope.userOf(context);
-      final rows = await AppScope.of(context).master.fetchDivisions(user);
+      final repo = AppScope.of(context);
+      final rows = await repo.master.fetchDivisions(user);
+      final accounts = await repo.employees.fetchTestingAccounts(user);
       if (!mounted) return;
       final usable = rows.where((d) => d.active).toList();
       final active = usable.map((d) => d.code).toList();
       setState(() {
+        _testingAccounts = accounts;
         _divisions = active;
         _divisionLabels = {
           for (final d in usable) d.code: d.label,
@@ -641,12 +645,29 @@ class _TestingAccountPageState extends State<TestingAccountPage> {
       _username.clear();
       _password.clear();
       _formKey.currentState?.reset();
+      await _load();
     } on AppException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (_) {
       if (mounted) setState(() => _error = 'Gagal membuat akun. Coba lagi.');
     } finally {
       if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _delete(EmployeeAccount account) async {
+    try {
+      await AppScope.of(context).employees.deleteEmployee(
+            SessionScope.userOf(context),
+            username: account.username,
+          );
+      if (!mounted) return;
+      showAppSnackBar(context, 'Akun ${account.username} dihapus.');
+      await _load();
+    } on AppException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'Gagal menghapus akun testing.');
     }
   }
 
@@ -724,6 +745,32 @@ class _TestingAccountPageState extends State<TestingAccountPage> {
               isLoading: _saving,
               onPressed: _save,
             ),
+            const SizedBox(height: AppSpacing.xl),
+            Text(
+              'Akun testing aktif (${_testingAccounts.length})',
+              style: Theme.of(context).textTheme.labelMedium,
+            ),
+            const SizedBox(height: 4),
+            if (_testingAccounts.isEmpty)
+              const Text('Belum ada akun testing.')
+            else
+              Column(
+                children: [
+                  for (final a in _testingAccounts)
+                    ListTile(
+                      dense: true,
+                      contentPadding: EdgeInsets.zero,
+                      leading: const Icon(Icons.science_outlined),
+                      title: Text(a.username),
+                      subtitle: Text(a.division.label),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        tooltip: 'Hapus akun',
+                        onPressed: _saving ? null : () => _delete(a),
+                      ),
+                    ),
+                ],
+              ),
           ],
         ),
       ),

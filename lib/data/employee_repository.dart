@@ -17,6 +17,9 @@ abstract class EmployeeRepository {
   /// Semua akun (aktif & nonaktif), urut nama.
   Future<List<EmployeeAccount>> fetchEmployees(AuthUser actor);
 
+  /// Daftar akun testing untuk dikelola/dihapus. Hanya Super Admin.
+  Future<List<EmployeeAccount>> fetchTestingAccounts(AuthUser actor);
+
   Future<EmployeeAccount> fetchEmployee(
     AuthUser actor, {
     required String username,
