@@ -7,6 +7,7 @@ import '../../core/session_storage.dart';
 import 'api_time.dart';
 import '../auth_repository.dart';
 import '../leave_repository.dart';
+import '../notification_repository.dart' show approvalBadgeNotifier;
 
 /// [LeaveRepository] via REST.
 class ApiLeaveRepository implements LeaveRepository {
@@ -227,6 +228,7 @@ class ApiLeaveRepository implements LeaveRepository {
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
     _ping();
+    approvalBadgeNotifier.value++;
     return _item(jsonDecode(res.body) as Map<String, dynamic>);
   }
   @override

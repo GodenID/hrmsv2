@@ -233,6 +233,23 @@ class _AppShellState extends State<AppShell> {
 
   ProfilePhotoController? _photo;
 
+  int _approvalCount = 0;
+  Timer? _approvalTimer;
+
+  int get _approvalsIndex =>
+      _destinations.indexWhere((d) => d.tab == ShellTab.approvals);
+
+  Future<void> _refreshApprovalCount() async {
+    if (!_user.role.canReviewRequests) return;
+    try {
+      final c = await AppScope.of(context).notifications.approvalCount(_user);
+      if (!mounted) return;
+      setState(() => _approvalCount = c.total);
+    } catch (_) {
+      // Badge boleh gagal segar; halaman persetujuan tetap bisa dipakai.
+    }
+  }
+
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
@@ -244,6 +261,12 @@ class _AppShellState extends State<AppShell> {
     // Ketukan notifikasi push (tray/banner) langsung ke detailnya. Yang
     // terjadi saat aplikasi mati diproses setelah shell tampil.
     PushNotifications.linkHandler = _openLink;
+    approvalBadgeNotifier.addListener(_refreshApprovalCount);
+    _refreshApprovalCount();
+    _approvalTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) => _refreshApprovalCount(),
+    );
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) PushNotifications.consumePendingTap();
     });
@@ -254,6 +277,8 @@ class _AppShellState extends State<AppShell> {
     if (PushNotifications.linkHandler == _openLink) {
       PushNotifications.linkHandler = null;
     }
+    approvalBadgeNotifier.removeListener(_refreshApprovalCount);
+    _approvalTimer?.cancel();
     _photo?.dispose();
     super.dispose();
   }
@@ -378,6 +403,9 @@ class _AppShellState extends State<AppShell> {
                         : _destinations[i].icon,
                   ),
                   title: Text(_destinations[i].label),
+                  trailing: _CountBadge(
+                    count: i == _approvalsIndex ? _approvalCount : 0,
+                  ),
                   onTap: () => Navigator.of(context).pop(i),
                 ),
             ],
@@ -433,14 +461,24 @@ class _AppShellState extends State<AppShell> {
         destinations: [
           for (final i in _primary)
             NavigationDestination(
-              icon: Icon(_destinations[i].icon),
+              icon: Badge(
+                isLabelVisible: i == _approvalsIndex && _approvalCount > 0,
+                label: Text(_approvalCount > 99 ? '99+' : '$_approvalCount'),
+                child: Icon(_destinations[i].icon),
+              ),
               selectedIcon: Icon(_destinations[i].selectedIcon),
               label: _destinations[i].label,
             ),
           if (hasMore)
-            const NavigationDestination(
-              icon: Icon(Icons.more_horiz),
-              selectedIcon: Icon(Icons.more_horiz),
+            NavigationDestination(
+              icon: Badge(
+                isLabelVisible: _approvalsIndex >= 0 &&
+                    !_primary.contains(_approvalsIndex) &&
+                    _approvalCount > 0,
+                label: Text(_approvalCount > 99 ? '99+' : '$_approvalCount'),
+                child: const Icon(Icons.more_horiz),
+              ),
+              selectedIcon: const Icon(Icons.more_horiz),
               label: 'Lainnya',
               tooltip: 'Menu lainnya',
             ),
@@ -492,6 +530,8 @@ class _AppShellState extends State<AppShell> {
                           destinations: _destinations,
                           selectedIndex: _index,
                           onSelect: _select,
+                          approvalsIndex: _approvalsIndex,
+                          approvalCount: _approvalCount,
                         ),
                         Expanded(
                           child: Column(
@@ -548,11 +588,15 @@ class _Sidebar extends StatelessWidget {
     required this.destinations,
     required this.selectedIndex,
     required this.onSelect,
+    required this.approvalsIndex,
+    required this.approvalCount,
   });
 
   final List<_Destination> destinations;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
+  final int approvalsIndex;
+  final int approvalCount;
 
   @override
   Widget build(BuildContext context) {
@@ -579,6 +623,7 @@ class _Sidebar extends StatelessWidget {
               destination: destinations[i],
               selected: i == selectedIndex,
               onTap: () => onSelect(i),
+              badge: i == approvalsIndex ? approvalCount : 0,
             ),
           ),
       ];
@@ -625,16 +670,47 @@ class _Sidebar extends StatelessWidget {
   }
 }
 
+class _CountBadge extends StatelessWidget {
+  const _CountBadge({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    if (count <= 0) return const SizedBox.shrink();
+    return Container(
+      constraints: const BoxConstraints(minWidth: 18, minHeight: 18),
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+      decoration: BoxDecoration(
+        color: context.danger,
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: Text(
+        count > 99 ? '99+' : '$count',
+        textAlign: TextAlign.center,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 11,
+          fontWeight: FontWeight.w700,
+          height: 1.35,
+        ),
+      ),
+    );
+  }
+}
+
 class _SidebarItem extends StatelessWidget {
   const _SidebarItem({
     required this.destination,
     required this.selected,
     required this.onTap,
+    this.badge = 0,
   });
 
   final _Destination destination;
   final bool selected;
   final VoidCallback onTap;
+  final int badge;
 
   @override
   Widget build(BuildContext context) {
@@ -664,14 +740,18 @@ class _SidebarItem extends StatelessWidget {
                         : context.inkSecondary,
                   ),
                   const SizedBox(width: 12),
-                  Text(
-                    destination.label,
-                    style: TextStyle(
-                      color: color,
-                      fontSize: 14,
-                      fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                  Expanded(
+                    child: Text(
+                      destination.label,
+                      style: TextStyle(
+                        color: color,
+                        fontSize: 14,
+                        fontWeight:
+                            selected ? FontWeight.w600 : FontWeight.w500,
+                      ),
                     ),
                   ),
+                  _CountBadge(count: badge),
                 ],
               ),
             ),

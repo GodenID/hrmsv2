@@ -2,6 +2,18 @@ import 'package:flutter/foundation.dart';
 
 import 'auth_repository.dart';
 
+/// Hitungan antrean persetujuan untuk badge menu.
+typedef ApprovalCount = ({
+  int total,
+  int leave,
+  int overtime,
+  int correction,
+  int outOfArea,
+});
+
+/// Berbunyi setelah ada persetujuan/penolakan agar badge segerar.
+final ValueNotifier<int> approvalBadgeNotifier = ValueNotifier<int>(0);
+
 /// Kontrak notifikasi di dalam aplikasi.
 ///
 /// Notifikasi dibuat oleh server saat terjadi sesuatu yang menyangkut
@@ -19,6 +31,9 @@ abstract class NotificationRepository {
   Future<List<AppNotification>> fetch(AuthUser user);
 
   Future<int> unreadCount(AuthUser user);
+
+  /// Jumlah pengajuan menunggu yang bisa diproses [user].
+  Future<ApprovalCount> approvalCount(AuthUser user);
 
   Future<void> markRead(AuthUser user, {required String id});
 

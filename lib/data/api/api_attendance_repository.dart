@@ -9,6 +9,7 @@ import '../attendance_repository.dart';
 import '../auth_repository.dart';
 import '../employee.dart';
 import '../leave_repository.dart' show LeaveAttachment, LeaveRequest, LeaveType;
+import '../notification_repository.dart' show approvalBadgeNotifier;
 
 /// [AttendanceRepository] via REST. Jam & jarak dihitung server.
 class ApiAttendanceRepository implements AttendanceRepository {
@@ -425,6 +426,7 @@ class ApiAttendanceRepository implements AttendanceRepository {
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
     _ping();
+    approvalBadgeNotifier.value++;
     final m = jsonDecode(res.body) as Map<String, dynamic>;
     return CorrectionReviewItem(
       employee: _ref(m['employee'] as Map<String, dynamic>),
@@ -524,6 +526,7 @@ class ApiAttendanceRepository implements AttendanceRepository {
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
     _ping();
+    approvalBadgeNotifier.value++;
     final m = jsonDecode(res.body) as Map<String, dynamic>;
     return OutOfAreaReviewItem(
       employee: _ref(m['employee'] as Map<String, dynamic>),

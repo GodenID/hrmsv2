@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import '../../core/session_storage.dart';
 import 'api_time.dart';
 import '../auth_repository.dart';
+import '../notification_repository.dart' show approvalBadgeNotifier;
 import '../overtime_repository.dart';
 
 /// [OvertimeRepository] via REST.
@@ -170,6 +171,7 @@ class ApiOvertimeRepository implements OvertimeRepository {
     );
     if (res.statusCode != 200) _throw(res.body, res.statusCode);
     _ping();
+    approvalBadgeNotifier.value++;
     final m = jsonDecode(res.body) as Map<String, dynamic>;
     return OvertimeReviewItem(
       employee: EmployeeRef(

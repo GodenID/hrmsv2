@@ -92,6 +92,26 @@ class ApiNotificationRepository implements NotificationRepository {
   }
 
   @override
+  Future<ApprovalCount> approvalCount(AuthUser user) async {
+    final res = await _client.get(
+      Uri.parse('$_base/approvals/count'),
+      headers: await _h(),
+    );
+    if (res.statusCode != 200) {
+      return (total: 0, leave: 0, overtime: 0, correction: 0, outOfArea: 0);
+    }
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    int n(String key) => (m[key] as num?)?.toInt() ?? 0;
+    return (
+      total: n('total'),
+      leave: n('leave'),
+      overtime: n('overtime'),
+      correction: n('correction'),
+      outOfArea: n('outOfArea'),
+    );
+  }
+
+  @override
   Future<void> markRead(AuthUser user, {required String id}) async {
     await _client.post(
       Uri.parse('$_base/notifications/$id/read'),

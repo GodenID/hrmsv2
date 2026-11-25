@@ -5,6 +5,7 @@ import 'package:shelf/shelf_io.dart' as io;
 import 'package:shelf_cors_headers/shelf_cors_headers.dart';
 
 import 'package:prasasti_server/announcement_handlers.dart';
+import 'package:prasasti_server/approval_count_handlers.dart';
 import 'package:prasasti_server/app_handlers.dart';
 import 'package:prasasti_server/attendance_handlers.dart';
 import 'package:prasasti_server/auth_handlers.dart';
@@ -83,6 +84,7 @@ Future<void> main() async {
       return emp.call(req);
     }
     if (p.startsWith('attendance')) return att.call(req);
+    if (p == 'approvals/count') return approvalCount(req, db, cfg);
     if (p.startsWith('leave')) return leave.call(req);
     if (p.startsWith('overtime')) return ot.call(req);
     if (p.startsWith('notifications')) return notif.call(req);
