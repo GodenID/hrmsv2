@@ -99,7 +99,12 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
     });
   }
 
+  bool _isSundayFor(String division) =>
+      isProduksiMutiariDivision(division) &&
+      _date?.weekday == DateTime.sunday;
+
   String? _rangeError() {
+    if (_isSundayFor(SessionScope.userOf(context).division)) return null;
     final s = _startAt;
     final e = _endAt;
     if (s == null || e == null) return null;
@@ -112,18 +117,22 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
 
   Future<void> _submit() async {
     if (_isSubmitting) return;
+    final user = SessionScope.userOf(context);
+    final isMutiari = isProduksiMutiariDivision(user.division);
+    final sunday = _isSundayFor(user.division);
     setState(() {
       _error = null;
       _dateError = _date == null ? 'Pilih tanggal lembur' : null;
-      _timeError = _startAt == null || _endAt == null
-          ? 'Pilih jam mulai dan jam selesai'
-          : _rangeError();
+      _timeError = sunday
+          ? null
+          : _startAt == null || _endAt == null
+              ? 'Pilih jam mulai dan jam selesai'
+              : _rangeError();
     });
     final formOk = _formKey.currentState?.validate() ?? false;
     if (!formOk ||
         _date == null ||
-        _startAt == null ||
-        _endAt == null ||
+        (!sunday && (_startAt == null || _endAt == null)) ||
         _timeError != null) {
       return;
     }
@@ -131,16 +140,18 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
     FocusScope.of(context).unfocus();
     setState(() => _isSubmitting = true);
     try {
+      final midnight = DateTime(_date!.year, _date!.month, _date!.day);
       await AppScope.of(context).overtime.submit(
-        SessionScope.userOf(context),
+        user,
         date: _date!,
-        start: _startAt!,
-        end: _endAt!,
+        start: sunday ? midnight : _startAt!,
+        end: sunday ? midnight : _endAt!,
         reason: _reasonController.text,
-        slot: isProduksiMutiariDivision(
-                SessionScope.userOf(context).division)
-            ? _slot
-            : OvertimeSlot.single,
+        slot: sunday
+            ? OvertimeSlot.sunday
+            : isMutiari
+                ? _slot
+                : OvertimeSlot.single,
       );
       if (!mounted) return;
       await showSuccessSheet(
@@ -168,8 +179,10 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final duration = _durationPreview;
-    final showSlot =
-        isProduksiMutiariDivision(SessionScope.userOf(context).division);
+    final division = SessionScope.userOf(context).division;
+    final isMutiari = isProduksiMutiariDivision(division);
+    final sunday = _isSundayFor(division);
+    final showSlot = isMutiari && !sunday;
 
     return PageScaffold(
       title: 'Ajukan lembur',
@@ -224,9 +237,20 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
                 ),
               ),
             ],
-            const SizedBox(height: AppSpacing.sm),
-            LayoutBuilder(
-              builder: (context, constraints) {
+            if (sunday) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Lembur Minggu tidak perlu jam mulai dan selesai. '
+                'Cukup tanggal dan keterangan.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: context.inkSecondary,
+                ),
+              ),
+            ],
+            if (!sunday) ...[
+              const SizedBox(height: AppSpacing.sm),
+              LayoutBuilder(
+                builder: (context, constraints) {
                 final startField = LabeledField(
                   label: 'Jam mulai',
                   child: PickerField(
@@ -288,6 +312,7 @@ class _OvertimeFormPageState extends State<OvertimeFormPage> {
                   ),
                 ),
               ),
+            ],
             ],
             const SizedBox(height: AppSpacing.sm),
             LabeledField(

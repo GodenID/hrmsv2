@@ -832,34 +832,48 @@ Router overtimeRouter(Db db, Config cfg) {
       if (today.difference(day).inDays > 30) {
         throw const _Http(422, 'Lembur hanya bisa diajukan untuk 30 hari terakhir.');
       }
-      if (s == null || e == null || !e.isAfter(s)) {
-        throw const _Http(422, 'Jam selesai harus setelah jam mulai pada tanggal yang sama.');
-      }
-      final ss = wibWallClockToUtc(day, s.hour, s.minute);
-      final ee = wibWallClockToUtc(day, e.hour, e.minute);
-      if (ee.difference(ss).inMinutes < 60) {
-        throw const _Http(422, 'Durasi lembur minimal 60 menit (1 jam).');
+      // Produksi Mutiari: Minggu memakai slot 'sunday' tanpa jam. Hari lain
+      // memakai dua slot pagi/malam. Divisi lain tetap satu slot biasa.
+      final isProduksiMutiari =
+          normalizedDivision(u['division']) == 'produksimutiari';
+      final isSunday = day.weekday == DateTime.sunday;
+      final sundayOvertime = isProduksiMutiari && isSunday;
+      final rawSlot = (b['slot'] ?? '').toString().trim().toLowerCase();
+      late final String slot;
+      late final DateTime ss;
+      late final DateTime ee;
+      if (sundayOvertime) {
+        if (rawSlot.isNotEmpty && rawSlot != 'sunday') {
+          throw const _Http(422, 'Lembur Minggu tidak memakai slot pagi/malam.');
+        }
+        slot = 'sunday';
+        ss = DateTime.utc(day.year, day.month, day.day);
+        ee = ss;
+      } else {
+        if (s == null || e == null || !e.isAfter(s)) {
+          throw const _Http(422, 'Jam selesai harus setelah jam mulai pada tanggal yang sama.');
+        }
+        ss = wibWallClockToUtc(day, s.hour, s.minute);
+        ee = wibWallClockToUtc(day, e.hour, e.minute);
+        if (ee.difference(ss).inMinutes < 60) {
+          throw const _Http(422, 'Durasi lembur minimal 60 menit (1 jam).');
+        }
+        if (isProduksiMutiari) {
+          if (rawSlot != 'morning' && rawSlot != 'evening') {
+            throw const _Http(422, 'Pilih lembur pagi atau lembur malam.');
+          }
+          slot = rawSlot;
+        } else {
+          slot = 'single';
+        }
       }
       if (reason.length < 10) {
         throw const _Http(422, 'Keterangan minimal 10 karakter.');
       }
-      // Produksi Mutiari memakai dua slot per tanggal: pagi dan malam.
-      // Divisi lain tetap satu pengajuan tanpa pilihan slot.
-      final rawSlot = (b['slot'] ?? '').toString().trim().toLowerCase();
-      final isProduksiMutiari =
-          normalizedDivision(u['division']) == 'produksimutiari';
-      late final String slot;
-      if (isProduksiMutiari) {
-        if (rawSlot != 'morning' && rawSlot != 'evening') {
-          throw const _Http(422, 'Pilih lembur pagi atau lembur malam.');
-        }
-        slot = rawSlot;
-      } else {
-        slot = 'single';
-      }
       final slotLabel = switch (slot) {
         'morning' => 'pagi',
         'evening' => 'malam',
+        'sunday' => 'Minggu',
         _ => '',
       };
       final created = await db.pool.runTx((tx) async {

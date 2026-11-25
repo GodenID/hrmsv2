@@ -290,7 +290,8 @@ class OvertimeReviewItem {
 enum OvertimeSlot {
   single('Lembur'),
   morning('Lembur pagi'),
-  evening('Lembur malam');
+  evening('Lembur malam'),
+  sunday('Lembur minggu');
 
   const OvertimeSlot(this.label);
 
@@ -326,13 +327,18 @@ class OvertimeRequest {
 
   Duration get duration => end.difference(start);
 
-  /// Mis. "3 jam 30 menit".
-  String get durationLabel => DateFormatId.duration(duration);
+  /// Mis. "3 jam 30 menit". Lembur Minggu tidak punya durasi.
+  String get durationLabel => slot == OvertimeSlot.sunday
+      ? '—'
+      : DateFormatId.duration(duration);
 
-  /// Mis. "Lembur pagi 03.00 – 05.00". Lembur biasa tanpa awalan.
-  String get timeRangeLabel =>
-      '${slot == OvertimeSlot.single ? '' : '${slot.label} '}'
-      '${DateFormatId.time(start)} – ${DateFormatId.time(end)}';
+  /// Lembur Minggu tidak punya jam. Mis. "Lembur pagi 03.00 – 05.00".
+  String get timeRangeLabel => switch (slot) {
+        OvertimeSlot.sunday => slot.label,
+        OvertimeSlot.single =>
+          '${DateFormatId.time(start)} – ${DateFormatId.time(end)}',
+        _ => '${slot.label} ${DateFormatId.time(start)} – ${DateFormatId.time(end)}',
+      };
 
   OvertimeRequest copyWith({
     RequestStatus? status,

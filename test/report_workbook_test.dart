@@ -492,6 +492,44 @@ void main() {
     });
   });
 
+  group('lembur minggu produksi mutiari', () {
+    final sunday = DateTime(2026, 11, 29);
+    OvertimeRequest sundayOt() => OvertimeRequest(
+          id: 'OT-SUN',
+          date: sunday,
+          start: sunday,
+          end: sunday,
+          reason: 'Lembur Minggu.',
+          status: RequestStatus.approved,
+          submittedAt: sunday,
+          slot: OvertimeSlot.sunday,
+        );
+
+    test('sheet Absensi: label dan durasi kosong, baris biru laut', () {
+      final sheet = attendanceSheet(
+        employees: [employee(username: 'bagas', fullName: 'Bagas')],
+        daysByUsername: {
+          'bagas': [
+            AttendanceDay(date: sunday, status: AttendanceDayStatus.dayOff),
+          ],
+        },
+        overtimeByUser: {'bagas': [sundayOt()]},
+        start: sunday,
+        end: sunday,
+      );
+      expect(sheet.rows.single[12], 'Lembur minggu');
+      expect(sheet.rows.single[13], '—');
+      expect(sheet.navyRows, {0});
+    });
+
+    test('sheet Lembur: baris biru laut', () {
+      final sheet = overtimeSheet(const {}, {'bagas': [sundayOt()]});
+      expect(sheet.rows.single[3], 'Lembur minggu');
+      expect(sheet.rows.single[4], '—');
+      expect(sheet.navyRows, {0});
+    });
+  });
+
   group('buildWorkbookBytes', () {
     test('menghasilkan berkas zip xlsx yang diawali PK', () {
       final bytes = buildWorkbookBytes([

@@ -29,6 +29,7 @@ class ReportSheetData {
     required this.header,
     required this.rows,
     this.highlightRows = const {},
+    this.navyRows = const {},
     this.statusCellColors = const {},
   });
 
@@ -39,6 +40,9 @@ class ReportSheetData {
   /// Indeks baris (0-based, tanpa header) yang diberi fill biru muda,
   /// mis. baris berlembur di sheet Absensi.
   final Set<int> highlightRows;
+
+  /// Baris lembur Minggu: biru laut, teks putih.
+  final Set<int> navyRows;
 
   /// Warna khusus kolom Kehadiran (indeks 5): baris -> hex warna.
   final Map<int, String> statusCellColors;
@@ -81,6 +85,21 @@ List<int>? buildWorkbookBytes(List<ReportSheetData> sheets) {
           CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
           _cell(row[c]),
           cellStyle: highlightStyle,
+        );
+      }
+    }
+    final navyStyle = CellStyle(
+      backgroundColorHex: ExcelColor.fromHexString('#123C69'),
+      fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
+    );
+    for (final r in sheet.navyRows) {
+      if (r < 0 || r >= sheet.rows.length) continue;
+      final row = sheet.rows[r];
+      for (var c = 0; c < sheet.header.length && c < row.length; c++) {
+        grid.updateCell(
+          CellIndex.indexByColumnRow(columnIndex: c, rowIndex: r + 1),
+          _cell(row[c]),
+          cellStyle: navyStyle,
         );
       }
     }
@@ -198,6 +217,7 @@ ReportSheetData attendanceSheet({
 
   final rows = <List<Object?>>[];
   final highlight = <int>{};
+  final navyRows = <int>{};
   final statusColors = <int, String>{};
   final sorted = [...employees]
     ..sort((a, b) => a.fullName.compareTo(b.fullName));
@@ -213,6 +233,9 @@ ReportSheetData attendanceSheet({
           byDate['${day.year}-${day.month}-${day.day}'];
       final overtimes = overtimeFor(e.username, day);
       if (overtimes.isNotEmpty) highlight.add(rows.length);
+      if (overtimes.any((o) => o.slot == OvertimeSlot.sunday)) {
+        navyRows.add(rows.length);
+      }
       final color = statusColorOf(info);
       if (color != null) statusColors[rows.length] = color;
       final overtimeMinutes = overtimes.fold<Duration>(
@@ -264,6 +287,7 @@ ReportSheetData attendanceSheet({
     ],
     rows: rows,
     highlightRows: highlight,
+    navyRows: navyRows,
     statusCellColors: statusColors,
   );
 }
@@ -447,6 +471,10 @@ ReportSheetData overtimeSheet(
       for (final r in entry.value)
         if (inPeriod(r.date, start, end)) (username: entry.key, request: r),
   ]..sort((a, b) => b.request.submittedAt.compareTo(a.request.submittedAt));
+  final navyRows = <int>{
+    for (var i = 0; i < flat.length; i++)
+      if (flat[i].request.slot == OvertimeSlot.sunday) i,
+  };
   final overtimeRows = <List<Object?>>[
     for (final e in flat)
       [
@@ -477,6 +505,7 @@ ReportSheetData overtimeSheet(
       'Catatan',
     ],
     rows: overtimeRows,
+    navyRows: navyRows,
   );
 }
 
