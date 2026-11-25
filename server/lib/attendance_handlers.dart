@@ -648,6 +648,58 @@ Router attendanceRouter(Db db, Config cfg) {
     }
   });
 
+  // ---------- adjustment web (Super Admin, tanpa pengajuan) ----------
+  r.post('/attendance/direct-adjust', (Request req) async {
+    try {
+      final actor = await me(req);
+      if (actor['role'] != 'superadmin') {
+        throw const _Http(403, 'Hanya Super Admin yang dapat melakukan adjustment absensi.');
+      }
+      final b = await readJson(req);
+      final username = ((b['username'] ?? '') as String).trim().toLowerCase();
+      final rawDate = DateTime.tryParse(((b['date'] ?? '') as String));
+      final ciInput = DateTime.tryParse(((b['clockIn'] ?? '') as String));
+      final coInput = DateTime.tryParse(((b['clockOut'] ?? '') as String));
+      if (username.isEmpty || rawDate == null || ciInput == null || coInput == null) {
+        throw const _Http(422, 'Karyawan, tanggal, jam masuk, dan jam pulang wajib diisi.');
+      }
+      final day = dateOnly(rawDate);
+      if (day.isAfter(dateOnly(nowWib()))) {
+        throw const _Http(422, 'Tanggal tidak boleh mendatang.');
+      }
+      final clockIn = wibWallClockToUtc(day, ciInput.hour, ciInput.minute);
+      final clockOut = wibWallClockToUtc(day, coInput.hour, coInput.minute);
+      if (!clockOut.isAfter(clockIn)) {
+        throw const _Http(422, 'Jam pulang harus setelah jam masuk.');
+      }
+      final target = await db.pool.runTx((tx) => tx.execute(Sql.named(
+            'SELECT id FROM users WHERE LOWER(username)=@u',
+          ), parameters: {'u': username}));
+      if (target.isEmpty) {
+        throw const _Http(404, 'Karyawan tidak ditemukan.');
+      }
+      final userId = (target.first.toColumnMap()['id'] as Object).toString();
+      await db.pool.runTx((tx) => tx.execute(Sql.named('''
+        INSERT INTO attendance_records(user_id, date, clock_in, clock_out)
+        VALUES(@i::uuid, @d, @ci, @co)
+        ON CONFLICT (user_id, date) DO UPDATE
+        SET clock_in=EXCLUDED.clock_in, clock_out=EXCLUDED.clock_out
+      '''), parameters: {
+        'i': userId,
+        'd': day.toIso8601String().substring(0, 10),
+        'ci': clockIn.toIso8601String(),
+        'co': clockOut.toIso8601String(),
+      }));
+      return json({
+        'ok': true,
+        'username': username,
+        'date': day.toIso8601String().substring(0, 10),
+      });
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
   // ---------- koreksi ----------
   r.post('/attendance/corrections', (Request req) async {
     try {

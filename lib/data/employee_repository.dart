@@ -29,6 +29,15 @@ abstract class EmployeeRepository {
     required EmployeeDraft draft,
   });
 
+  /// Akun testing untuk website: hanya username, password, dan divisi.
+  /// Nama otomatis dari username, role staff, profil dianggap lengkap.
+  Future<EmployeeCreated> createTestingAccount(
+    AuthUser actor, {
+    required String username,
+    required String password,
+    required String division,
+  });
+
   /// Membuat banyak akun sekaligus dengan username & password acak.
   /// Hanya Super Admin. Password sementara hanya dikembalikan sekali
   /// (untuk dibagikan ke karyawan); akun wajib ganti password + lengkapi

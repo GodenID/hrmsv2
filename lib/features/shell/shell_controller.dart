@@ -14,6 +14,8 @@ enum ShellTab {
   warnings,
   broadcast,
   masterData,
+  webAdjustment,
+  webTesting,
 }
 
 /// Aksi navigasi tingkat shell yang bisa dipanggil dari halaman mana pun

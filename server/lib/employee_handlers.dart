@@ -295,6 +295,69 @@ Router employeeRouter(Db db, Config cfg) {
     }
   });
 
+  // Akun testing khusus web: hanya username, password, dan divisi.
+  r.post('/employees/testing', (Request req) async {
+    try {
+      final actor = await requireSuperAdmin(req);
+      final b = await readJson(req);
+      final name = ((b['username'] ?? '') as String).trim().toLowerCase();
+      final password = ((b['password'] ?? '') as String).trim();
+      final division = ((b['division'] ?? '') as String).trim();
+      final uErr = validateUsername(name);
+      if (uErr != null) return json({'message': uErr}, status: 422);
+      if (password.length < 6) {
+        return json({'message': 'Password minimal 6 karakter.'}, status: 422);
+      }
+      if (division.isEmpty) {
+        return json({'message': 'Pilih divisi terlebih dahulu.'}, status: 422);
+      }
+      final created = await db.pool.runTx((tx) async {
+        final exists = await tx.execute(
+          Sql.named('SELECT 1 FROM users WHERE username=@u'),
+          parameters: {'u': name},
+        );
+        if (exists.isNotEmpty) {
+          throw const _Http(409, 'Username sudah dipakai. Pilih yang lain.');
+        }
+        final div = await tx.execute(Sql.named(
+          'SELECT code FROM divisions WHERE LOWER(code)=LOWER(@d) AND active',
+        ), parameters: {'d': division});
+        if (div.isEmpty) {
+          throw const _Http(422, 'Divisi tidak ditemukan atau sudah nonaktif.');
+        }
+        final code = (div.first.toColumnMap()['code'] as Object).toString();
+        final marker = 'TEST-${name.toUpperCase()}';
+        await tx.execute(Sql.named('''
+          INSERT INTO users(username, full_name, role, nik, employee_id, position,
+            division, employment_status, join_date, email, phone, password_hash,
+            must_change_password, profile_complete)
+          VALUES(@u,@fn,'staff',@nik,@eid,'Staf',@div,'external',@jd,@em,@ph,@pw,FALSE,TRUE)
+          RETURNING username
+        '''), parameters: {
+          'u': name,
+          'fn': name,
+          'nik': marker,
+          'eid': marker,
+          'div': code,
+          'jd': DateTime.now().toUtc().toIso8601String().substring(0, 10),
+          'em': '$name@testing.local',
+          'ph': '-',
+          'pw': BCrypt.hashpw(password, BCrypt.gensalt()),
+        });
+        return accountRow(tx, name);
+      });
+      return json(
+        {
+          'account': toAccount(created, actor, storeOf(cfg), cfg.s3avatarPublic),
+          'temporaryPassword': password,
+        },
+        status: 201,
+      );
+    } on _Http catch (h) {
+      return json({'message': h.message}, status: h.status);
+    }
+  });
+
   String randomUsername(Random r) {
     const letters = 'abcdefghjkmnpqrstuvwxyz';
     const digits = '23456789';

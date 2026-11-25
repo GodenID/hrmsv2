@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/app_scope.dart';
@@ -23,6 +24,7 @@ import '../notifications/broadcast_page.dart';
 import '../reports/reports_page.dart';
 import '../settings/master_data_page.dart';
 import '../warnings/warnings_page.dart';
+import '../web_admin/web_admin_pages.dart';
 import '../notifications/widgets/notification_bell.dart';
 import '../profile/profile_photo.dart';
 import 'notification_link.dart';
@@ -148,6 +150,28 @@ List<_Destination> _destinationsFor(UserRole role) {
         icon: Icons.tune_outlined,
         selectedIcon: Icons.tune,
         builder: (_) => const MasterDataPage(),
+        section: _Section.manage,
+        primaryOnMobile: false,
+      ),
+    // Khusus website: adjustment absensi & akun testing. Sengaja tidak
+    // didaftarkan di APK (kIsWeb false) sesuai permintaan produk.
+    if (kIsWeb && role == UserRole.superadmin)
+      _Destination(
+        tab: ShellTab.webAdjustment,
+        label: 'Adjustment',
+        icon: Icons.edit_calendar_outlined,
+        selectedIcon: Icons.edit_calendar,
+        builder: (_) => const AttendanceAdjustmentPage(),
+        section: _Section.manage,
+        primaryOnMobile: false,
+      ),
+    if (kIsWeb && role == UserRole.superadmin)
+      _Destination(
+        tab: ShellTab.webTesting,
+        label: 'Akun testing',
+        icon: Icons.science_outlined,
+        selectedIcon: Icons.science,
+        builder: (_) => const TestingAccountPage(),
         section: _Section.manage,
         primaryOnMobile: false,
       ),

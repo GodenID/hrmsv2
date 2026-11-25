@@ -270,6 +270,28 @@ class ApiAttendanceRepository implements AttendanceRepository {
   }
 
   @override
+  Future<void> directAdjust(
+    AuthUser actor, {
+    required String username,
+    required DateTime date,
+    required DateTime clockIn,
+    required DateTime clockOut,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/attendance/direct-adjust'),
+      headers: await _h(),
+      body: jsonEncode({
+        'username': username,
+        'date': date.toIso8601String().substring(0, 10),
+        'clockIn': clockIn.toIso8601String(),
+        'clockOut': clockOut.toIso8601String(),
+      }),
+    );
+    if (res.statusCode != 200) _throw(res.body, res.statusCode);
+    _ping();
+  }
+
+  @override
   Future<List<AttendanceDay>> fetchMonth(AuthUser user,
       {required int year, required int month, String? username}) async {
     final target = username == null || username.isEmpty

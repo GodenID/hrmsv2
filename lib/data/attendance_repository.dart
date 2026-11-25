@@ -46,6 +46,16 @@ abstract class AttendanceRepository {
   /// Hapus lokasi absen — hanya Super Admin. Minimal satu lokasi tersisa.
   Future<void> deleteLocation(AuthUser actor, {required String id});
 
+  /// Adjustment absensi langsung oleh Super Admin di website. Menulis
+  /// `attendance_records` tanpa pengajuan/persetujuan.
+  Future<void> directAdjust(
+    AuthUser actor, {
+    required String username,
+    required DateTime date,
+    required DateTime clockIn,
+    required DateTime clockOut,
+  });
+
   /// Hari-hari dalam satu bulan untuk kalender absensi, terbaru dulu:
   /// - hari kerja sampai hari ini (beserta catatan absensinya),
   /// - semua hari kerja yang tercakup pengajuan cuti / izin / sakit yang

@@ -175,6 +175,33 @@ class ApiEmployeeRepository implements EmployeeRepository {
   }
 
   @override
+  Future<EmployeeCreated> createTestingAccount(
+    AuthUser actor, {
+    required String username,
+    required String password,
+    required String division,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('$_base/employees/testing'),
+      headers: await _h(),
+      body: jsonEncode({
+        'username': username,
+        'password': password,
+        'division': division,
+      }),
+    );
+    if (res.statusCode != 200 && res.statusCode != 201) {
+      _throw(res.body, res.statusCode);
+    }
+    final m = jsonDecode(res.body) as Map<String, dynamic>;
+    _ping();
+    return EmployeeCreated(
+      account: _parse(m['account'] as Map<String, dynamic>),
+      temporaryPassword: (m['temporaryPassword'] ?? '').toString(),
+    );
+  }
+
+  @override
   Future<List<EmployeeCredential>> createBulk(
     AuthUser actor, {
     int? count,
