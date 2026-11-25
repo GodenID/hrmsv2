@@ -10,6 +10,7 @@ import 'authz.dart';
 import 'config.dart';
 import 'db.dart';
 import 's3.dart';
+import 'tokens.dart' show sha256Hex;
 import 'validate.dart';
 
 Response json(Object body, {int status = 200}) => Response(
@@ -326,7 +327,8 @@ Router employeeRouter(Db db, Config cfg) {
           throw const _Http(422, 'Divisi tidak ditemukan atau sudah nonaktif.');
         }
         final code = (div.first.toColumnMap()['code'] as Object).toString();
-        final marker = 'TEST-${name.toUpperCase()}';
+        // kolom nik/employee_id hanya VARCHAR(16) dan UNIQUE.
+        final marker = sha256Hex('testing:$name').substring(0, 16);
         await tx.execute(Sql.named('''
           INSERT INTO users(username, full_name, role, nik, employee_id, position,
             division, employment_status, join_date, email, phone, password_hash,
