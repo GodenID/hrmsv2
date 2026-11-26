@@ -27,6 +27,12 @@ Future<void> main() async {
   );
   await AppInfo.load();
   runApp(PrasastiConnectApp(dependencies: dependencies));
+  // APK hasil update tidak perlu menumpuk di penyimpanan pengguna.
+  unawaited(
+    dependencies.updater.cleanupInstalled(
+      int.tryParse(AppInfo.buildNumber) ?? 0,
+    ),
+  );
   // Push: nonblokir & nonfatal. Tanpa file Firebase, diam-diam nonaktif.
   if (dependencies.notifications is ApiNotificationRepository) {
     final repo = dependencies.notifications as ApiNotificationRepository;

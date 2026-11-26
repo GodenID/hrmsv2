@@ -222,6 +222,24 @@ class AppUpdater {
     return file;
   }
 
+  /// Hapus APK unduhan yang versinya sudah terpasang. Dipanggil saat start.
+  Future<void> cleanupInstalled(int installedCode) async {
+    if (kIsWeb || !supported || installedCode <= 0) return;
+    try {
+      final dir = await _directory();
+      await for (final entity in dir.list()) {
+        if (entity is! File || !entity.path.endsWith('.apk')) continue;
+        final match = RegExp(r'update-(\d+)\.apk$').firstMatch(entity.path);
+        final code = match == null ? null : int.tryParse(match.group(1)!);
+        if (code == null || code <= installedCode) {
+          try {
+            await entity.delete();
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+  }
+
   Future<bool> canInstall() async {
     if (!supported) return false;
     try {

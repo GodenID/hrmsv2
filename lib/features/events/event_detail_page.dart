@@ -405,7 +405,7 @@ class _EventDetailPageState extends State<EventDetailPage> {
                     ),
                   InfoRow(
                     label: 'Ukuran event',
-                    value: _thresholds == null
+                    value: (_thresholds == null || e.poValue == null)
                         ? e.size.label
                         : '${e.size == EventSize.overLimit ? 'Melebihi batas event besar' : 'Event ${e.size.label.toLowerCase()}'}'
                               ' (PO ${_thresholds!.rangeLabel(e.size)})',
